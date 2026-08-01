@@ -14,9 +14,9 @@ struct DayPageHeader: View {
     private var koyomi: Koyomi.Day { Koyomi.day(for: date) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             topRow
-            HStack(alignment: .top, spacing: 4) {
+            HStack(alignment: .center, spacing: 4) {
                 leftColumn
                 Spacer(minLength: 2)
                 numeral
@@ -70,7 +70,7 @@ struct DayPageHeader: View {
 
     private var numeral: some View {
         Text(day.dayNumber)
-            .font(.system(size: 210, weight: .black))
+            .font(.system(size: 140, weight: .black))
             .minimumScaleFactor(0.4)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .center)
