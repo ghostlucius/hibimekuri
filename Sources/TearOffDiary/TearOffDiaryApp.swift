@@ -33,7 +33,7 @@ struct TearOffDiaryApp: App {
                 .environment(diaryStore)
                 .environment(taskStore)
                 .environment(wordStore)
-                .frame(minWidth: 480, minHeight: 640)
+                .frame(minWidth: 480, maxWidth: 760, minHeight: 640, maxHeight: 1100)
         }
         .defaultSize(width: 640, height: 820)
 

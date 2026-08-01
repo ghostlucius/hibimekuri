@@ -4,21 +4,21 @@ struct RootView: View {
     @State private var navigator = Navigator()
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Group {
-                switch navigator.screen {
-                case .today:
-                    TodayView()
-                case .archive:
-                    NavigationStack {
-                        ArchiveView()
-                    }
+        Group {
+            switch navigator.screen {
+            case .today:
+                TodayView()
+            case .archive:
+                NavigationStack {
+                    ArchiveView()
                 }
             }
-
-            cornerMenu
         }
+        // Force this to fill the window BEFORE attaching the overlay, so the
+        // icon cluster is positioned relative to the real window bounds —
+        // not to whatever small size the active screen's content wants.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .topTrailing) { cornerMenu }
         .environment(navigator)
     }
 

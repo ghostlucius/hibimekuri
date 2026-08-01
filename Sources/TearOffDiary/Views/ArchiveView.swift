@@ -30,6 +30,7 @@ struct ArchiveView: View {
                 .listStyle(.inset)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(Localizer.t("アーカイブ", "Archive", language: language))
     }
 }
