@@ -24,6 +24,8 @@ struct MemoBox: View {
                     .font(.system(size: 12))
                     .scrollContentBackground(.hidden)
                     .disabled(!isEditable)
+                    .padding(.top, 4)
+                    .padding(.leading, 1)
                     .frame(minHeight: 70)
             }
             .padding(6)

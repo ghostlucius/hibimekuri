@@ -96,6 +96,30 @@ struct TaskListView: View {
     }
 }
 
+/// Icon-only button with a real tap target — a bare SF Symbol on
+/// `.buttonStyle(.plain)` is only hittable on its literal glyph pixels,
+/// which made the row's move/delete/expand controls very easy to miss.
+private struct IconButton: View {
+    let systemName: String
+    var size: CGFloat = 9
+    var weight: Font.Weight = .semibold
+    var color: Color = .secondary
+    var rotation: Double = 0
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: size, weight: weight))
+                .foregroundStyle(color)
+                .rotationEffect(.degrees(rotation))
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 private struct TaskRow: View {
     let task: TaskItem
     let isExpanded: Bool
@@ -103,7 +127,6 @@ private struct TaskRow: View {
 
     @Environment(TaskStore.self) private var store
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
-    @State private var isHovering = false
     @State private var newStepText = ""
     @State private var showDatePicker = false
     @State private var pendingDeferDate = Date()
@@ -120,33 +143,46 @@ private struct TaskRow: View {
         )
     }
 
-    private var isDeferred: Bool {
-        guard !task.isDone, let deferDate = task.deferDate else { return false }
-        return deferDate > Calendar.current.startOfDay(for: Date())
+    /// Relative feedback for a defer date — "in N days" while still hidden,
+    /// "Today" the day it reappears, "Overdue" (flagged red) if it arrived
+    /// and is still sitting there undone. A date with no feedback at all
+    /// isn't useful, which was the actual complaint.
+    private var deferBadge: (text: String, isOverdue: Bool)? {
+        guard !task.isDone, let deferDate = task.deferDate else { return nil }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let target = calendar.startOfDay(for: deferDate)
+        let days = calendar.dateComponents([.day], from: today, to: target).day ?? 0
+        switch days {
+        case ..<0:
+            return (Localizer.t("期限切れ", "Overdue", language: language), true)
+        case 0:
+            return (Localizer.t("今日", "Today", language: language), false)
+        case 1:
+            return (Localizer.t("明日", "Tomorrow", language: language), false)
+        default:
+            return (Localizer.t("\(days)日後", "in \(days) days", language: language), false)
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Button {
+            HStack(spacing: 2) {
+                IconButton(systemName: task.isDone ? "checkmark.square.fill" : "square", size: 12, color: task.isDone ? .primary : .secondary) {
                     withAnimation(.easeInOut(duration: 0.12)) {
                         store.toggleDone(task.id)
                     }
-                } label: {
-                    Image(systemName: task.isDone ? "checkmark.square.fill" : "square")
-                        .foregroundStyle(task.isDone ? Color.primary : Color.secondary)
                 }
-                .buttonStyle(.plain)
 
                 Text(task.title)
                     .font(.system(size: 12))
                     .strikethrough(task.isDone)
                     .foregroundStyle(task.isDone ? .secondary : .primary)
 
-                if isDeferred, let deferDate = task.deferDate {
-                    Text(deferDate.formatted(date: .abbreviated, time: .omitted))
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.tertiary)
+                if let badge = deferBadge {
+                    Text(badge.text)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(badge.isOverdue ? Color.red : Color.secondary)
                 }
 
                 if !task.checklist.isEmpty {
@@ -157,36 +193,11 @@ private struct TaskRow: View {
 
                 Spacer()
 
-                if isHovering {
-                    Button(action: { store.moveUp(task.id) }) {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .buttonStyle(.plain)
-                    Button(action: { store.moveDown(task.id) }) {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .buttonStyle(.plain)
-                    Button(action: { store.delete(task.id) }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Button(action: onToggleExpand) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                }
-                .buttonStyle(.plain)
+                IconButton(systemName: "chevron.up") { store.moveUp(task.id) }
+                IconButton(systemName: "chevron.down") { store.moveDown(task.id) }
+                IconButton(systemName: "xmark", size: 10, color: .secondary) { store.delete(task.id) }
+                IconButton(systemName: "chevron.right", rotation: isExpanded ? 90 : 0, action: onToggleExpand)
             }
-            .onHover { isHovering = $0 }
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
@@ -198,15 +209,10 @@ private struct TaskRow: View {
                     deferRow
 
                     ForEach(task.checklist) { item in
-                        HStack(spacing: 6) {
-                            Button {
+                        HStack(spacing: 4) {
+                            IconButton(systemName: item.isDone ? "checkmark.square" : "square", size: 11, color: item.isDone ? .primary : .secondary) {
                                 store.toggleChecklistItem(taskId: task.id, itemId: item.id)
-                            } label: {
-                                Image(systemName: item.isDone ? "checkmark.square" : "square")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(item.isDone ? Color.primary : Color.secondary)
                             }
-                            .buttonStyle(.plain)
 
                             Text(item.title)
                                 .font(.system(size: 12))
@@ -215,12 +221,9 @@ private struct TaskRow: View {
 
                             Spacer()
 
-                            Button(action: { store.deleteChecklistItem(taskId: task.id, itemId: item.id) }) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(.tertiary)
+                            IconButton(systemName: "xmark", size: 9) {
+                                store.deleteChecklistItem(taskId: task.id, itemId: item.id)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
 
@@ -251,15 +254,15 @@ private struct TaskRow: View {
                 .foregroundStyle(.tertiary)
 
             if let deferDate = task.deferDate {
-                Text(Localizer.t("予定: \(deferDate.formatted(date: .abbreviated, time: .omitted))", "Scheduled: \(deferDate.formatted(date: .abbreviated, time: .omitted))", language: language))
+                Text(verbatim: "\(deferDate.formatted(date: .abbreviated, time: .omitted))")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                Button(action: clearDefer) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
+                if let badge = deferBadge {
+                    Text(badge.text)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(badge.isOverdue ? Color.red : Color.secondary)
                 }
-                .buttonStyle(.plain)
+                IconButton(systemName: "xmark", size: 9, action: clearDefer)
             } else if showDatePicker {
                 DatePicker("", selection: $pendingDeferDate, in: Date()..., displayedComponents: .date)
                     .labelsHidden()
@@ -280,7 +283,6 @@ private struct TaskRow: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .buttonStyle(.plain)
     }
 
     private func clearDefer() {
