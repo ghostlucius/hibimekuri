@@ -9,19 +9,25 @@ struct EditablePageView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 12) {
                 DayPageHeader(date: entry.date, language: language)
                 HairlineDivider()
                 DailyQuoteView(date: entry.date, quote: quote)
                 HairlineDivider()
                 TaskListView()
                 MemoBox(text: $entry.journalText)
-                Spacer(minLength: 4)
+                Spacer(minLength: 2)
                 if let onTearOff {
                     tearButton(onTearOff)
                 }
             }
-            .padding(28)
+            .padding(.horizontal, 18)
+            .padding(.bottom, 18)
+            // Extra top clearance: the corner icon cluster (Today/Archive)
+            // floats at a fixed position over the window, independent of
+            // scroll position — without this the header's top-right month
+            // text collides with it now that the page has gotten compact.
+            .padding(.top, 44)
             .frame(maxWidth: .infinity)
         }
         .background(DS.paper)
@@ -32,11 +38,11 @@ struct EditablePageView: View {
             HStack {
                 Spacer()
                 Text(Localizer.t("今日を切り取る", "TEAR OFF TODAY", language: language))
-                    .font(.system(size: 12, weight: .bold))
-                    .tracking(1.5)
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.2)
                 Spacer()
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .overlay(
                 Rectangle().stroke(Color.primary, lineWidth: 1)
             )

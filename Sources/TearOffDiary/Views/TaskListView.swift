@@ -34,7 +34,7 @@ struct TaskListView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(Localizer.t("やること", "TO DO", language: language))
                 .font(DS.smallCaption)
                 .foregroundStyle(.secondary)
@@ -139,7 +139,7 @@ private struct TaskRow: View {
                 .buttonStyle(.plain)
 
                 Text(task.title)
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .strikethrough(task.isDone)
                     .foregroundStyle(task.isDone ? .secondary : .primary)
 

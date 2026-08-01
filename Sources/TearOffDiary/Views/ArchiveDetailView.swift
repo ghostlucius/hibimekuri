@@ -12,7 +12,7 @@ struct ArchiveDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 12) {
                 DayPageHeader(date: entry.date, language: language)
 
                 HairlineDivider()
@@ -36,7 +36,9 @@ struct ArchiveDetailView: View {
                     .font(.system(size: 12))
                 }
             }
-            .padding(28)
+            .padding(.horizontal, 18)
+            .padding(.bottom, 18)
+            .padding(.top, 44)
             .frame(maxWidth: .infinity)
         }
         .navigationTitle(day.fullDateLabel(language: language))

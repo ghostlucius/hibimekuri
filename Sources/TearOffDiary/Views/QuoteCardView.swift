@@ -5,7 +5,7 @@ struct QuoteCardView: View {
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(sourceLabel.uppercased())
                 .font(DS.smallCaption)
                 .foregroundStyle(.secondary)
@@ -15,18 +15,18 @@ struct QuoteCardView: View {
             // chrome translates. English mode adds the meaning underneath
             // rather than replacing the original text.
             Text(quote.japanese)
-                .font(.system(size: 20, weight: .medium))
+                .font(.system(size: 16, weight: .medium))
 
             if language == .english {
                 Text(quote.english)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: 12, weight: .regular))
                     .italic()
                     .foregroundStyle(.secondary)
             }
 
             if let attribution = quote.attribution {
                 Text(verbatim: "— \(attribution)")
-                    .font(.system(size: 11))
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
         }

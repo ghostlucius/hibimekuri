@@ -22,15 +22,15 @@ struct MiniMonthGrid: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(Localizer.month(number: calendar.component(.month, from: monthDate), language: language))
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 8, weight: .bold))
                 .foregroundStyle(.secondary)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 1), count: 7), spacing: 2) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 1), count: 7), spacing: 1) {
                 ForEach(0..<7, id: \.self) { i in
                     Text(Localizer.miniWeekday(index: i, language: language))
-                        .font(.system(size: 7))
+                        .font(.system(size: 6))
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity)
                 }
@@ -38,20 +38,20 @@ struct MiniMonthGrid: View {
                     if let d = cells[idx] {
                         let isHighlighted = highlight.map { calendar.isDate($0, inSameDayAs: d) } ?? false
                         Text(verbatim: "\(calendar.component(.day, from: d))")
-                            .font(.system(size: 7))
-                            .frame(maxWidth: .infinity, minHeight: 12)
+                            .font(.system(size: 6))
+                            .frame(maxWidth: .infinity, minHeight: 10)
                             .foregroundStyle(isHighlighted ? DS.paper : .secondary)
                             .background(
                                 Circle().fill(isHighlighted ? Color.primary : Color.clear)
                             )
                     } else {
                         Text("")
-                            .font(.system(size: 7))
-                            .frame(maxWidth: .infinity, minHeight: 12)
+                            .font(.system(size: 6))
+                            .frame(maxWidth: .infinity, minHeight: 10)
                     }
                 }
             }
         }
-        .frame(width: 100)
+        .frame(width: 92)
     }
 }

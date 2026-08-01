@@ -45,10 +45,12 @@ struct TearOffDiaryApp: App {
                 // Page content fills whatever width it's given (see
                 // EditablePageView) rather than capping at a fixed value, so
                 // there's no dead gutter regardless of where the window ends
-                // up in this range.
-                .frame(minWidth: 560, maxWidth: 800, minHeight: 640, maxHeight: 1100)
+                // up in this range. Kept compact — closer to the size of the
+                // physical desk calendar this app is modeled on, not a
+                // full document window.
+                .frame(minWidth: 420, maxWidth: 560, minHeight: 560, maxHeight: 900)
         }
-        .defaultSize(width: 620, height: 820)
+        .defaultSize(width: 460, height: 680)
 
         Settings {
             SettingsView()

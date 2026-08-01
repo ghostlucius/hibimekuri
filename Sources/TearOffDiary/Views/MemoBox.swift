@@ -21,10 +21,10 @@ struct MemoBox: View {
                         .padding(.leading, 5)
                 }
                 TextEditor(text: $text)
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .scrollContentBackground(.hidden)
                     .disabled(!isEditable)
-                    .frame(minHeight: 110)
+                    .frame(minHeight: 70)
             }
             .padding(6)
             .overlay(
