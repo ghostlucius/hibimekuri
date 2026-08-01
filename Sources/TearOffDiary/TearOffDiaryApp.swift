@@ -9,6 +9,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        for window in NSApp.windows {
+            // Every dev rebuild reuses the same bundle identifier, so macOS's
+            // window-frame restoration was reopening the window at whatever
+            // size the *very first* test launch used, ignoring any later
+            // frame/size changes in code. Opting this window out of that
+            // system entirely is what makes .frame()/.defaultSize() in
+            // TearOffDiaryApp actually the source of truth going forward.
+            window.isRestorable = false
+        }
         NSApp.windows.first?.makeKeyAndOrderFront(nil)
     }
 
@@ -33,12 +42,13 @@ struct TearOffDiaryApp: App {
                 .environment(diaryStore)
                 .environment(taskStore)
                 .environment(wordStore)
-                // The page content caps at 560pt wide (see EditablePageView);
-                // keep the window close to that so there's no dead gutter on
-                // either side, while still leaving a little slack to resize.
-                .frame(minWidth: 560, maxWidth: 620, minHeight: 640, maxHeight: 1100)
+                // Page content fills whatever width it's given (see
+                // EditablePageView) rather than capping at a fixed value, so
+                // there's no dead gutter regardless of where the window ends
+                // up in this range.
+                .frame(minWidth: 560, maxWidth: 800, minHeight: 640, maxHeight: 1100)
         }
-        .defaultSize(width: 580, height: 820)
+        .defaultSize(width: 620, height: 820)
 
         Settings {
             SettingsView()

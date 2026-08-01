@@ -37,7 +37,7 @@ struct ArchiveDetailView: View {
                 }
             }
             .padding(28)
-            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle(day.fullDateLabel(language: language))
     }

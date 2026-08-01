@@ -22,7 +22,7 @@ struct EditablePageView: View {
                 }
             }
             .padding(28)
-            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
         }
         .background(DS.paper)
     }
