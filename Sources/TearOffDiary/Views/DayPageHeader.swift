@@ -10,20 +10,70 @@ struct DayPageHeader: View {
     let date: Date
     var language: AppLanguage = .japanese
 
+    @Environment(TaskStore.self) private var taskStore
+    @State private var showMonthFlip = false
+    @State private var flipDegrees: Double = 0
+
     private var day: CalendarDay { CalendarDay(date: date) }
     private var koyomi: Koyomi.Day { Koyomi.day(for: date) }
+
+    /// Days carrying a task due date, normalized to midnight — used to dot
+    /// the mini calendars and the flip calendar alike.
+    private var dueDates: Set<Date> {
+        Set(taskStore.tasks.compactMap { task -> Date? in
+            guard !task.isDone, let deferDate = task.deferDate else { return nil }
+            return Calendar.current.startOfDay(for: deferDate)
+        })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             topRow
             HStack(alignment: .center, spacing: 4) {
                 leftColumn
-                Spacer(minLength: 2)
-                numeral
-                Spacer(minLength: 2)
+                Spacer(minLength: 8)
+                numeralArea
+                Spacer(minLength: 8)
                 rightColumn
             }
             miniCalendarRow
+        }
+    }
+
+    /// Tapping the numeral flips it into a full current-month calendar
+    /// (matching the visual language of the mini prev/next calendars below),
+    /// dotted with due dates; tapping again flips back. The angle jumps to
+    /// the opposite side at the invisible edge-on midpoint so swapping the
+    /// content there reads as one continuous flip rather than a snap.
+    private var numeralArea: some View {
+        Group {
+            if showMonthFlip {
+                MiniMonthGrid(monthDate: date, highlight: date, markedDates: dueDates, language: language, large: true)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                numeral
+            }
+        }
+        // Fixed height so the row's overall height (and therefore where
+        // leftColumn/rightColumn land when centered in it) doesn't change
+        // between the numeral and the flip calendar — they have different
+        // natural heights, which was making the side columns visibly hop
+        // up and down on every flip.
+        .frame(height: 160)
+        .rotation3DEffect(.degrees(flipDegrees), axis: (x: 0, y: 1, z: 0))
+        .contentShape(Rectangle())
+        .onTapGesture { toggleFlip() }
+    }
+
+    private func toggleFlip() {
+        withAnimation(.easeIn(duration: 0.18)) {
+            flipDegrees = 90
+        } completion: {
+            showMonthFlip.toggle()
+            flipDegrees = -90
+            withAnimation(.easeOut(duration: 0.18)) {
+                flipDegrees = 0
+            }
         }
     }
 
@@ -32,19 +82,20 @@ struct DayPageHeader: View {
     /// no dead gap between "year" and "month" the way splitting them
     /// across separate rows created.
     private var topRow: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                if language == .japanese {
-                    VerticalText(text: day.weekdayLabel(language: .japanese), font: .system(size: 26, weight: .bold))
-                    Text(verbatim: "[\(day.weekdayLabel(language: .english).prefix(3).uppercased())]")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(day.weekdayLabel(language: .english))
-                        .font(.system(size: 24, weight: .bold))
-                }
-            }
-            Spacer()
+        // Restructured 2026-08-02 after repeated failed attempts to *pad*
+        // the weekday down to meet month's baseline (28pt, then 60pt, then
+        // 64pt — none of it ever actually landed right, because guessing a
+        // constant for "however tall the year+era block happens to be" was
+        // the wrong tool). Year+era now sits in its own row above,
+        // right-aligned; weekday and month are direct siblings in one
+        // `HStack(alignment: .firstTextBaseline)` below it — SwiftUI's
+        // *built-in* baseline alignment (not a custom guess) reliably
+        // aligns direct siblings, which weekday/month never were before
+        // (weekday sat in an unrelated leading VStack while month was
+        // buried inside the trailing year/era VStack). 大/小 (month
+        // length) moved below the month label instead of beside it, per
+        // explicit request, which also simplified this row.
+        VStack(alignment: .trailing, spacing: 6) {
             VStack(alignment: .trailing, spacing: 1) {
                 Text(verbatim: "\(day.year)")
                     .font(.system(size: 13, weight: .semibold))
@@ -57,7 +108,22 @@ struct DayPageHeader: View {
                         .font(.system(size: 8))
                         .foregroundStyle(.tertiary)
                 }
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
+            }
+
+            HStack(alignment: .firstTextBaseline) {
+                if language == .japanese {
+                    VStack(alignment: .leading, spacing: 2) {
+                        VerticalText(text: day.weekdayLabel(language: .japanese), font: .system(size: 26, weight: .bold))
+                        Text(verbatim: "[\(day.weekdayLabel(language: .english).prefix(3).uppercased())]")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(day.weekdayLabel(language: .english))
+                        .font(.system(size: 24, weight: .bold))
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 0) {
                     Text(day.monthLabel(language: language))
                         .font(.system(size: 26, weight: .bold))
                     Text(verbatim: "(\(Localizer.monthKind(koyomi.monthKind, language: language)))")
@@ -128,12 +194,12 @@ struct DayPageHeader: View {
     private var miniCalendarRow: some View {
         HStack(alignment: .top) {
             if let prevMonth = Calendar.current.date(byAdding: .month, value: -1, to: date) {
-                MiniMonthGrid(monthDate: prevMonth, language: language)
+                MiniMonthGrid(monthDate: prevMonth, markedDates: dueDates, language: language)
                     .frame(width: 92, alignment: .leading)
             }
             Spacer(minLength: 2)
             if let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: date) {
-                MiniMonthGrid(monthDate: nextMonth, language: language)
+                MiniMonthGrid(monthDate: nextMonth, markedDates: dueDates, language: language)
                     .frame(width: 92, alignment: .trailing)
             }
         }

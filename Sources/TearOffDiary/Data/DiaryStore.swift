@@ -3,15 +3,30 @@ import Foundation
 @Observable
 final class DiaryStore {
     private(set) var entries: [DiaryEntry] = []
+    private(set) var storageDirectory: URL
 
-    private let fileURL: URL
+    private var fileURL: URL
 
     init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = appSupport.appendingPathComponent("TearOffDiary", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dir = StorageLocation.activeDirectory
+        storageDirectory = dir
         fileURL = dir.appendingPathComponent("entries.json")
         load()
+    }
+
+    /// Re-points the store at wherever it should live after the iCloud
+    /// setting changes, carrying the already-loaded data across (it's the
+    /// freshest copy we have) and removing the stale file left behind at
+    /// the old location rather than orphaning it.
+    func relocateStorage() {
+        let newDir = StorageLocation.activeDirectory
+        let newURL = newDir.appendingPathComponent("entries.json")
+        guard newURL != fileURL else { return }
+        let oldURL = fileURL
+        fileURL = newURL
+        storageDirectory = newDir
+        save()
+        try? FileManager.default.removeItem(at: oldURL)
     }
 
     func entry(for date: Date) -> DiaryEntry? {

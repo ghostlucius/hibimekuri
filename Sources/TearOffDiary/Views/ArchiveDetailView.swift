@@ -39,6 +39,8 @@ struct ArchiveDetailView: View {
             .padding(.horizontal, 18)
             .padding(.bottom, 18)
             .padding(.top, 44)
+            // Same fullscreen-centering treatment as EditablePageView.
+            .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
         }
         .navigationTitle(day.fullDateLabel(language: language))

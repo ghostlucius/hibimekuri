@@ -143,6 +143,17 @@ private struct TaskRow: View {
         )
     }
 
+    private var titleBinding: Binding<String> {
+        Binding(
+            get: { task.title },
+            set: { newValue in
+                var updated = task
+                updated.title = newValue
+                store.update(updated)
+            }
+        )
+    }
+
     /// Relative feedback for a defer date — "in N days" while still hidden,
     /// "Today" the day it reappears, "Overdue" (flagged red) if it arrived
     /// and is still sitting there undone. A date with no feedback at all
@@ -174,29 +185,64 @@ private struct TaskRow: View {
                     }
                 }
 
-                Text(task.title)
-                    .font(.system(size: 12))
-                    .strikethrough(task.isDone)
-                    .foregroundStyle(task.isDone ? .secondary : .primary)
-
-                if let badge = deferBadge {
-                    Text(badge.text)
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(badge.isOverdue ? Color.red : Color.secondary)
+                // The title is a real editable field (rename in place) — kept
+                // as its own view, separate from the expand-tap cluster
+                // below, so a click to rename and a click to expand can't
+                // fight over the same gesture. Done tasks stay a plain
+                // strikethrough Text: renaming something already finished
+                // isn't a case worth wiring up, and TextField doesn't render
+                // strikethrough anyway.
+                if task.isDone {
+                    Text(task.title)
+                        .font(.system(size: 12))
+                        .strikethrough(true)
+                        .foregroundStyle(.secondary)
+                } else {
+                    TextField("", text: titleBinding)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.primary)
                 }
 
-                if !task.checklist.isEmpty {
-                    Text(verbatim: "\(task.checklist.filter { $0.isDone }.count)/\(task.checklist.count)")
-                        .font(.system(size: 9, weight: .medium))
+                HStack(spacing: 6) {
+                    if let badge = deferBadge {
+                        Text(badge.text)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(badge.isOverdue ? Color.red : Color.secondary)
+                    }
+
+                    if !task.checklist.isEmpty {
+                        Text(verbatim: "\(task.checklist.filter { $0.isDone }.count)/\(task.checklist.count)")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
+                .frame(minWidth: 20, minHeight: 20)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onToggleExpand)
 
                 Spacer()
 
-                IconButton(systemName: "chevron.up") { store.moveUp(task.id) }
-                IconButton(systemName: "chevron.down") { store.moveDown(task.id) }
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 20, height: 20)
+                    .contentShape(Rectangle())
+                    .draggable(task.id.uuidString)
+
                 IconButton(systemName: "xmark", size: 10, color: .secondary) { store.delete(task.id) }
-                IconButton(systemName: "chevron.right", rotation: isExpanded ? 90 : 0, action: onToggleExpand)
+            }
+            .dropDestination(for: String.self) { items, _ in
+                guard let idString = items.first, let draggedId = UUID(uuidString: idString) else { return false }
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    store.move(draggedId: draggedId, to: task.id)
+                }
+                return true
             }
 
             if isExpanded {

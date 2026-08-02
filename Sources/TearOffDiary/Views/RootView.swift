@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @State private var navigator = Navigator()
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Group {
@@ -18,8 +19,20 @@ struct RootView: View {
         // icon cluster is positioned relative to the real window bounds —
         // not to whatever small size the active screen's content wants.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Back to the raw top-trailing corner: the earlier cap-and-center
+        // wrapper existed only for when fullscreen showed the compact page
+        // centered on extra background. That approach was replaced by
+        // ExtendedPageView's own two-pane layout, which already extends to
+        // the window's real right edge, so the plain corner overlay lines
+        // up correctly in both compact and extended mode again.
         .overlay(alignment: .topTrailing) { cornerMenu }
         .environment(navigator)
+        // Tracks both an explicit Light/Dark choice and, while "System" is
+        // selected, live system appearance changes — colorScheme reflects
+        // NSApp's effective appearance either way.
+        .onChange(of: colorScheme, initial: true) { _, newValue in
+            AppIconManager.apply(colorScheme: newValue)
+        }
     }
 
     private var cornerMenu: some View {

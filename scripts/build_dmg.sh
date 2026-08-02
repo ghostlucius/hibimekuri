@@ -35,6 +35,17 @@ if [ -d "$RESOURCE_BUNDLE" ]; then
     cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
 fi
 
+# App icon: two variants (Classic Light/Dark, see scripts/generate_app_icon.swift)
+# copied to the top level of Contents/Resources — CFBundleIconFile below
+# points at the static one Finder/Dock show before launch; AppIconManager
+# swaps the running app's Dock tile to the dark one at runtime.
+if [ -f "AppIcon/AppIcon.icns" ]; then
+    cp "AppIcon/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+fi
+if [ -f "AppIcon/AppIconDark.icns" ]; then
+    cp "AppIcon/AppIconDark.icns" "$APP_DIR/Contents/Resources/AppIconDark.icns"
+fi
+
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -52,6 +63,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <string>$VERSION</string>
     <key>CFBundleExecutable</key>
     <string>$APP_NAME</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>

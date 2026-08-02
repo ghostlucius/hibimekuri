@@ -3,15 +3,28 @@ import Foundation
 @Observable
 final class TaskStore {
     private(set) var tasks: [TaskItem] = []
+    private(set) var storageDirectory: URL
 
-    private let fileURL: URL
+    private var fileURL: URL
 
     init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = appSupport.appendingPathComponent("TearOffDiary", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dir = StorageLocation.activeDirectory
+        storageDirectory = dir
         fileURL = dir.appendingPathComponent("tasks.json")
         load()
+    }
+
+    /// See `DiaryStore.relocateStorage()` — same move-not-copy behavior,
+    /// kept in sync so entries and tasks always live in the same place.
+    func relocateStorage() {
+        let newDir = StorageLocation.activeDirectory
+        let newURL = newDir.appendingPathComponent("tasks.json")
+        guard newURL != fileURL else { return }
+        let oldURL = fileURL
+        fileURL = newURL
+        storageDirectory = newDir
+        save()
+        try? FileManager.default.removeItem(at: oldURL)
     }
 
     func add(title: String) {
@@ -55,6 +68,30 @@ final class TaskStore {
         let target = idx + delta
         guard group.indices.contains(target) else { return }
         group.swapAt(idx, target)
+        for (position, item) in group.enumerated() {
+            if let ti = tasks.firstIndex(where: { $0.id == item.id }) {
+                tasks[ti].order = position
+            }
+        }
+        save()
+    }
+
+    /// Drag-and-drop reorder: moves `draggedId` to sit where `targetId`
+    /// currently is. Scoped to the dragged task's own group (active/done),
+    /// same rule as the old nudge buttons this replaces — a drop onto a
+    /// task in the other group is a no-op rather than crossing the boundary.
+    func move(draggedId: UUID, to targetId: UUID) {
+        guard draggedId != targetId,
+              let dragged = tasks.first(where: { $0.id == draggedId }),
+              let target = tasks.first(where: { $0.id == targetId }),
+              dragged.isDone == target.isDone else { return }
+
+        var group = tasks.filter { $0.isDone == dragged.isDone }.sorted { $0.order < $1.order }
+        guard let fromIdx = group.firstIndex(where: { $0.id == draggedId }),
+              let toIdx = group.firstIndex(where: { $0.id == targetId }) else { return }
+
+        let moved = group.remove(at: fromIdx)
+        group.insert(moved, at: toIdx)
         for (position, item) in group.enumerated() {
             if let ti = tasks.firstIndex(where: { $0.id == item.id }) {
                 tasks[ti].order = position
