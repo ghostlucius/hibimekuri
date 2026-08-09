@@ -19,18 +19,21 @@ struct ExtendedPageView: View {
     var onPrevDay: (() -> Void)? = nil
     var onNextDay: (() -> Void)? = nil
     var onJumpToToday: (() -> Void)? = nil
+    /// Passed down from `EditablePageView` so the task list, note box, and
+    /// tear button here are recognized as the same elements as their
+    /// compact-mode counterparts — see the doc comment on
+    /// `EditablePageView.transitionNamespace`.
+    var transitionNamespace: Namespace.ID
 
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
     @State private var isEditingNote = false
     @FocusState private var noteFocused: Bool
 
-    /// Same inline-markdown rendering as `MemoBox` (bold/italic/strikethrough/
-    /// code/links) — kept here rather than routing through MemoBox itself
-    /// since this pane also needs the monospace font and the day-nav row
-    /// MemoBox doesn't have.
+    /// Full block Markdown (headings, lists, blockquotes, code — see
+    /// BlockMarkdownRenderer) rather than MemoBox's inline-only rendering:
+    /// this pane has the room for it, the compact memo doesn't.
     private var renderedNote: AttributedString {
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        return (try? AttributedString(markdown: entry.journalText, options: options)) ?? AttributedString(entry.journalText)
+        BlockMarkdownRenderer.render(entry.journalText)
     }
 
     /// The calendar side stays fixed — literally the same `DayPageHeader`
@@ -66,13 +69,11 @@ struct ExtendedPageView: View {
             VStack(alignment: .leading, spacing: 12) {
                 DayPageHeader(date: entry.date, language: language)
                 HairlineDivider()
-                // The quote card's own text is left-aligned internally
-                // (matches compact mode's QuoteCardView exactly), but as a
-                // block it's centered under the numeral above rather than
-                // hugging the pane's left edge — otherwise it visually
-                // orphans itself from the centered numeral it sits under.
+                // Left-aligned to match compact mode's QuoteCardView
+                // exactly — centering it under the numeral (tried
+                // previously) made it inconsistent with the compact page,
+                // which was the more important match to keep.
                 DailyQuoteView(date: entry.date, quote: quote)
-                    .frame(maxWidth: .infinity, alignment: .center)
             }
             .padding(20)
         }
@@ -83,10 +84,12 @@ struct ExtendedPageView: View {
     private var rightPane: some View {
         VStack(alignment: .leading, spacing: 24) {
             taskSection
+                .matchedGeometryEffect(id: "tasks", in: transitionNamespace)
             HairlineDivider()
             noteSection
+                .matchedGeometryEffect(id: "note", in: transitionNamespace)
             tearButton
-            Spacer(minLength: 4)
+                .matchedGeometryEffect(id: "tearButton", in: transitionNamespace)
         }
         .padding(32)
         // Extra top clearance: the corner icon cluster (Today/Archive)
@@ -97,8 +100,21 @@ struct ExtendedPageView: View {
         // pane itself is 80% of a wide window — otherwise task rows and the
         // note just stretch edge to edge with a huge gap between the title
         // and the trailing icons, which looks broken, not spacious.
-        .frame(maxWidth: 760, alignment: .leading)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        //
+        // Both constraints belong in one `frame` call, not two chained
+        // ones — chaining `.frame(maxWidth: 760)` and then
+        // `.frame(maxHeight: .infinity)` on separate calls only let the
+        // *outer* frame report a flexible height up to its own parent; it
+        // never fed that extra height back down into the VStack, so the
+        // VStack (and everything in it, including the note box below) just
+        // sized to its own intrinsic content height and got top-aligned
+        // inside the leftover space — which is exactly the dead space
+        // below "TEAR OFF TODAY" on a tall window. Setting both in a
+        // single call proposes the full available height to the VStack
+        // itself, so its one flexible child (the note box, see noteSection
+        // below) can actually grow into it.
+        .frame(maxWidth: 760, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private var taskSection: some View {
@@ -112,9 +128,6 @@ struct ExtendedPageView: View {
                     .font(DS.smallCaption)
                     .foregroundStyle(.secondary)
                     .tracking(1.2)
-                Text(Localizer.t("Markdown対応", "Markdown", language: language))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
                 Spacer()
                 Menu {
                     Button(Localizer.t("メモを消去", "Clear note", language: language), role: .destructive) {
@@ -126,7 +139,14 @@ struct ExtendedPageView: View {
                         .foregroundStyle(.secondary)
                 }
                 .menuStyle(.borderlessButton)
+                // SwiftUI draws its own disclosure arrow next to any custom
+                // Menu label by default (Menu.menuIndicator(.visible), the
+                // default) — that's what was showing up glued onto the
+                // ellipsis icon. This is the only supported way to turn it
+                // off; the icon alone already reads as "more options".
+                .menuIndicator(.hidden)
                 .frame(width: 20)
+                .help(Localizer.t("その他のオプション", "More options", language: language))
             }
 
             Group {
@@ -135,13 +155,21 @@ struct ExtendedPageView: View {
                         .font(.system(size: 12, design: .monospaced))
                         .scrollContentBackground(.hidden)
                         .focused($noteFocused)
-                        // Only grabs focus when the preview is tapped
-                        // (isEditingNote flips true) — never on mere
-                        // appearance, which stole keystrokes typed
+                        // Only grabs focus when isEditingNote flips true
+                        // (tapping the rendered preview below) — never on
+                        // mere appearance, which stole keystrokes typed
                         // anywhere else in the app the instant an empty
-                        // note scrolled into view.
-                        .onChange(of: isEditingNote) { _, editing in
-                            if editing { noteFocused = true }
+                        // note scrolled into view. initial: true is still
+                        // needed: this TextEditor is a brand-new view the
+                        // moment isEditingNote becomes true (that's what
+                        // creates it), so without initial:true this
+                        // onChange's first evaluation IS that already-true
+                        // state, and onChange never fires on first
+                        // appearance by default — the focus grab silently
+                        // never ran, requiring a second click to focus the
+                        // now-visible editor manually.
+                        .onChange(of: isEditingNote, initial: true) { _, editing in
+                            noteFocused = editing
                         }
                         .onChange(of: noteFocused) { _, focused in
                             if !focused { isEditingNote = false }
@@ -157,7 +185,11 @@ struct ExtendedPageView: View {
                 }
             }
             .padding(6)
-            .frame(height: 220)
+            // Was a fixed 220pt regardless of window height — the one
+            // deliberately flexible element in the pane now, so a tall
+            // window's extra height goes into more writing room instead of
+            // sitting empty below the tear-off button.
+            .frame(minHeight: 220, maxHeight: .infinity)
             .overlay(Rectangle().stroke(DS.hairline, lineWidth: 1))
 
             HStack {
@@ -170,6 +202,7 @@ struct ExtendedPageView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .disabled(onJumpToToday == nil)
+                .help(Localizer.t("今日にジャンプ", "Jump to today", language: language))
 
                 Spacer()
 
@@ -216,17 +249,19 @@ struct ExtendedPageView: View {
     }
 }
 
-/// Task list for the extended pane — same `TaskStore` and rules as the
-/// compact `TaskListView` (drag reorder scoped to active/done group, click
-/// title to edit, expand for checklist/notes/defer), with a dot-grid drag
-/// handle instead of the compact page's hamburger icon (a structural
-/// choice kept from the original concept — not color-theme related).
+/// Task list for the extended pane — same `TaskStore` and Things-style
+/// interaction as the compact `TaskListView`, including its real
+/// `AppKitTaskTable`-backed drag-to-reorder — see TaskListView.swift for
+/// the full story of why a direct `NSTableView` wrapper instead of
+/// SwiftUI's own `List`/`.draggable`.
 private struct ExtendedTaskSection: View {
     let language: AppLanguage
 
     @Environment(TaskStore.self) private var store
     @State private var newTaskText = ""
-    @State private var expandedTaskIDs: Set<UUID> = []
+    // Single-optional, not a Set — only one task is ever open at a time.
+    @State private var expandedTaskID: UUID?
+    @State private var selectedTaskID: UUID?
     @State private var showDeferred = false
     @FocusState private var fieldFocused: Bool
 
@@ -240,6 +275,14 @@ private struct ExtendedTaskSection: View {
     private func isDeferred(_ task: TaskItem) -> Bool {
         guard !task.isDone, let deferDate = task.deferDate else { return false }
         return deferDate > Calendar.current.startOfDay(for: Date())
+    }
+
+    /// See TaskListView.swift's identical helper for the full rationale.
+    private func estimatedHeight(for group: [TaskItem], expanded: UUID?) -> CGFloat {
+        let collapsedRowHeight: CGFloat = 34
+        let expandedExtra: CGFloat = 180
+        let hasExpanded = expanded.map { id in group.contains { $0.id == id } } ?? false
+        return CGFloat(group.count) * collapsedRowHeight + (hasExpanded ? expandedExtra : 0)
     }
 
     var body: some View {
@@ -259,8 +302,18 @@ private struct ExtendedTaskSection: View {
                 .buttonStyle(.plain)
             }
 
-            ForEach(activeTasks) { task in row(task) }
-            ForEach(doneTasks) { task in row(task) }
+            if !activeTasks.isEmpty {
+                AppKitTaskTable(items: activeTasks, taskStore: store, onReorder: { reordered in
+                    store.reorder(reordered)
+                }) { task in row(task) }
+                    .frame(height: estimatedHeight(for: activeTasks, expanded: expandedTaskID))
+            }
+            if !doneTasks.isEmpty {
+                AppKitTaskTable(items: doneTasks, taskStore: store, onReorder: { reordered in
+                    store.reorder(reordered)
+                }) { task in row(task) }
+                    .frame(height: estimatedHeight(for: doneTasks, expanded: expandedTaskID))
+            }
 
             HStack(spacing: 8) {
                 Image(systemName: "plus")
@@ -288,16 +341,24 @@ private struct ExtendedTaskSection: View {
                 }
             }
         }
+        // Things-style "click anywhere else closes/deselects it" — see
+        // TaskListView.swift's identical use of this notification for the
+        // full rationale.
+        .onReceive(NotificationCenter.default.publisher(for: .taskInteractionReset)) { _ in
+            selectedTaskID = nil
+            expandedTaskID = nil
+        }
     }
 
     private func row(_ task: TaskItem) -> some View {
-        ExtendedTaskRow(task: task, language: language, isExpanded: expandedTaskIDs.contains(task.id)) {
-            if expandedTaskIDs.contains(task.id) {
-                expandedTaskIDs.remove(task.id)
-            } else {
-                expandedTaskIDs.insert(task.id)
-            }
-        }
+        ExtendedTaskRow(
+            task: task,
+            language: language,
+            isExpanded: expandedTaskID == task.id,
+            isSelected: selectedTaskID == task.id,
+            onOpen: { expandedTaskID = task.id },
+            onSelect: { selectedTaskID = task.id }
+        )
     }
 
     private func addTask() {
@@ -311,13 +372,17 @@ private struct ExtendedTaskRow: View {
     let task: TaskItem
     let language: AppLanguage
     let isExpanded: Bool
-    let onToggleExpand: () -> Void
+    let isSelected: Bool
+    let onOpen: () -> Void
+    let onSelect: () -> Void
 
     @Environment(TaskStore.self) private var store
     @State private var newStepText = ""
     @State private var showDatePicker = false
     @State private var pendingDeferDate = Date()
+    @State private var isEditingTitle = false
     @FocusState private var stepFieldFocused: Bool
+    @FocusState private var titleFocused: Bool
 
     private var titleBinding: Binding<String> {
         Binding(get: { task.title }, set: { var t = task; t.title = $0; store.update(t) })
@@ -355,6 +420,11 @@ private struct ExtendedTaskRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // One line, not two — the badge/checklist-count used to sit on
+            // their own right-aligned row below the title, which is why
+            // "Overdue" never lined up with the task the way it does in
+            // the compact layout even though extended mode has more room,
+            // not less. Same single-line shape as the compact TaskRow now.
             HStack(spacing: 8) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.12)) { store.toggleDone(task.id) }
@@ -365,37 +435,10 @@ private struct ExtendedTaskRow: View {
                 }
                 .buttonStyle(.plain)
 
-                if task.isDone {
-                    Text(task.title)
-                        .font(.system(size: 13))
-                        .strikethrough(true)
-                        .foregroundStyle(.secondary)
-                } else {
-                    TextField("", text: titleBinding)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                }
+                titleView
 
                 Spacer()
 
-                DotGridHandle()
-                    .draggable(task.id.uuidString)
-
-                Button { store.delete(task.id) } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .dropDestination(for: String.self) { items, _ in
-                guard let idString = items.first, let draggedId = UUID(uuidString: idString) else { return false }
-                withAnimation(.easeInOut(duration: 0.15)) { store.move(draggedId: draggedId, to: task.id) }
-                return true
-            }
-
-            HStack(spacing: 10) {
-                Spacer()
                 if let badge = deferBadge {
                     Text(badge.text)
                         .font(.system(size: 10, weight: .semibold))
@@ -406,21 +449,37 @@ private struct ExtendedTaskRow: View {
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(.tertiary)
                 }
-                Button(action: onToggleExpand) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+
+                Button { store.delete(task.id) } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.vertical, 3)
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? DS.selection : Color.clear)
+            .contentShape(Rectangle())
+            // Double-click always opens (never toggles closed) — closing
+            // only happens by clicking elsewhere (see taskInteractionReset).
+            .onTapGesture(count: 2) {
+                onOpen()
+                if !task.isDone {
+                    isEditingTitle = true
+                }
+            }
+            .onTapGesture(count: 1) {
+                guard !isEditingTitle else { return }
+                onSelect()
+            }
+            // Dragging is handled entirely by the enclosing
+            // AppKitTaskTable's real NSTableView machinery now.
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
-                    TextField(Localizer.t("メモ", "Notes", language: language), text: notesBinding, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                    MarkdownNotesField(text: notesBinding, placeholder: Localizer.t("メモ", "Notes", language: language))
 
                     deferRow
 
@@ -505,23 +564,40 @@ private struct ExtendedTaskRow: View {
             }
         }
     }
-}
 
-/// A small 2×3 dot-grid drag handle, matching the concept's icon — no exact
-/// SF Symbol match, so built directly rather than approximated with the
-/// wrong glyph (e.g. a hamburger icon).
-private struct DotGridHandle: View {
-    var body: some View {
-        VStack(spacing: 2.5) {
-            ForEach(0..<3, id: \.self) { _ in
-                HStack(spacing: 2.5) {
-                    ForEach(0..<2, id: \.self) { _ in
-                        Circle().fill(Color.secondary).frame(width: 2.5, height: 2.5)
+    /// Plain text until a double-click on the row starts a rename — see the
+    /// compact TaskRow's identical rationale and fix in TaskListView.swift
+    /// (deferred focus-grab + isExpanded-driven reset — confirmed via real
+    /// click/drag testing to be a genuine race, not theoretical).
+    private var titleView: some View {
+        Group {
+            if task.isDone {
+                Text(task.title)
+                    .strikethrough(true)
+                    .foregroundStyle(.secondary)
+            } else if isEditingTitle {
+                TextField("", text: titleBinding)
+                    .textFieldStyle(.plain)
+                    .focused($titleFocused)
+                    .onChange(of: isEditingTitle, initial: true) { _, editing in
+                        if editing {
+                            DispatchQueue.main.async { titleFocused = true }
+                        } else {
+                            titleFocused = false
+                        }
                     }
-                }
+                    .onChange(of: titleFocused) { _, focused in
+                        if !focused { isEditingTitle = false }
+                    }
+            } else {
+                Text(task.title)
             }
         }
-        .frame(width: 20, height: 20)
-        .contentShape(Rectangle())
+        .font(.system(size: 13))
+        .onChange(of: isExpanded) { _, expanded in
+            if !expanded {
+                isEditingTitle = false
+            }
+        }
     }
 }

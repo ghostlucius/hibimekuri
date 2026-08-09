@@ -45,21 +45,29 @@ struct DayPageHeader: View {
     /// dotted with due dates; tapping again flips back. The angle jumps to
     /// the opposite side at the invisible edge-on midpoint so swapping the
     /// content there reads as one continuous flip rather than a snap.
+    /// Width matches MiniMonthGrid's own `large` size exactly — the fixed
+    /// grid width, not just "however much space is left over".
+    private static let numeralAreaWidth: CGFloat = 140
+
     private var numeralArea: some View {
         Group {
             if showMonthFlip {
                 MiniMonthGrid(monthDate: date, highlight: date, markedDates: dueDates, language: language, large: true)
-                    .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 numeral
             }
         }
-        // Fixed height so the row's overall height (and therefore where
-        // leftColumn/rightColumn land when centered in it) doesn't change
-        // between the numeral and the flip calendar — they have different
-        // natural heights, which was making the side columns visibly hop
-        // up and down on every flip.
-        .frame(height: 160)
+        // Fixed width AND height so this slot's box is byte-for-byte
+        // identical in both states. Before, only height was pinned — the
+        // numeral's `.frame(maxWidth: .infinity)` let it greedily claim
+        // whatever flexible space was left in the row, while the grid below
+        // is a rigid fixed width; those aren't the same number in general,
+        // so the row's total width actually changed between states, and
+        // since leftColumn/rightColumn come along for the ride, the whole
+        // right side visibly slid sideways on every flip. Pinning both
+        // states to one constant box removes the ambiguity entirely rather
+        // than hoping the two branches happen to size themselves the same.
+        .frame(width: Self.numeralAreaWidth, height: 160)
         .rotation3DEffect(.degrees(flipDegrees), axis: (x: 0, y: 1, z: 0))
         .contentShape(Rectangle())
         .onTapGesture { toggleFlip() }

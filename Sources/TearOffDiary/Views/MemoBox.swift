@@ -4,9 +4,13 @@ import SwiftUI
 /// editor risk — this codebase has already been bitten once by gesture/focus
 /// conflicts around TextEditor, see the "Known SwiftUI traps" note in
 /// requirements.md); markdown only renders in a separate read-only preview
-/// shown when the field isn't focused, using SwiftUI's built-in inline
-/// markdown parsing (bold/italic/strikethrough/code/links) rather than a
-/// hand-built block-level renderer.
+/// shown when the field isn't focused, using the same block renderer as the
+/// extended layout's NOTE panel (BlockMarkdownRenderer — headings, lists,
+/// blockquotes, code, plus inline bold/italic/strikethrough/code/links).
+/// Originally scoped to inline-only here, on the theory that a small memo
+/// box didn't need full block structure — reversed once raw "# heading"
+/// text sitting unrendered turned out to just look broken rather than
+/// "appropriately simple".
 struct MemoBox: View {
     @Binding var text: String
     var isEditable: Bool = true
@@ -15,8 +19,7 @@ struct MemoBox: View {
     @FocusState private var isFocused: Bool
 
     private var renderedMarkdown: AttributedString {
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
+        BlockMarkdownRenderer.render(text)
     }
 
     /// Read-only pages always show the rendered preview (no reason to ever
@@ -30,18 +33,10 @@ struct MemoBox: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(Localizer.t("メモ", "MEMO", language: language))
-                    .font(DS.smallCaption)
-                    .foregroundStyle(.secondary)
-                    .tracking(1.2)
-                Spacer()
-                if isEditable {
-                    Text(Localizer.t("Markdown対応", "Markdown", language: language))
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
-                }
-            }
+            Text(Localizer.t("メモ", "MEMO", language: language))
+                .font(DS.smallCaption)
+                .foregroundStyle(.secondary)
+                .tracking(1.2)
 
             ZStack(alignment: .topLeading) {
                 if text.isEmpty && isEditable {
@@ -63,13 +58,24 @@ struct MemoBox: View {
                         .focused($isFocused)
                         .padding(.leading, -5)
                         .frame(minHeight: 70)
-                        // Only grabs focus in response to the tap below
-                        // (isEditing flipping true) — never on mere
-                        // appearance, which was stealing keystrokes typed
-                        // anywhere else in the app the instant an empty
-                        // note scrolled into view.
-                        .onChange(of: isEditing) { _, editing in
-                            if editing { isFocused = true }
+                        // Only grabs focus in response to isEditing flipping
+                        // true (tapping the rendered preview below) — never
+                        // on mere appearance, which was stealing keystrokes
+                        // typed anywhere else in the app the instant an
+                        // empty note scrolled into view. initial: true is
+                        // still required, though: this TextEditor is a
+                        // brand-new view the moment it exists at all (the
+                        // tap that set isEditing=true is what created it in
+                        // the first place), so without initial:true this
+                        // onChange's very first evaluation IS that
+                        // already-true state — and onChange never fires on
+                        // a view's first appearance by default, so the
+                        // focus grab silently never ran. That's why it took
+                        // a second, separate click (to focus the now-
+                        // visible-but-unfocused editor manually) instead of
+                        // the tap itself landing the cursor.
+                        .onChange(of: isEditing, initial: true) { _, editing in
+                            isFocused = editing
                         }
                         .onChange(of: isFocused) { _, focused in
                             if !focused { isEditing = false }

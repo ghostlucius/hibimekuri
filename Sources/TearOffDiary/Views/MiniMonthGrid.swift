@@ -7,7 +7,8 @@ import SwiftUI
 struct MiniMonthGrid: View {
     let monthDate: Date
     var highlight: Date? = nil
-    /// Days that carry a task due date — rendered as a small dot.
+    /// Days that carry a task due date — rendered as a red ring around
+    /// the day number, like a date circled on a real paper calendar.
     var markedDates: Set<Date> = []
     var language: AppLanguage = .japanese
     var large: Bool = false
@@ -18,8 +19,16 @@ struct MiniMonthGrid: View {
     private var weekdayFont: CGFloat { large ? 8 : 6 }
     private var dayFont: CGFloat { large ? 9 : 6 }
     private var cellMinHeight: CGFloat { large ? 17 : 12 }
-    private var dotSize: CGFloat { large ? 3.5 : 3 }
-    private var gridWidth: CGFloat { large ? 168 : 92 }
+    private var ringLineWidth: CGFloat { large ? 1.2 : 0.9 }
+    // 168 was wide enough to work in earlier wide-window screenshots, but
+    // that never actually tested the real compact window: 88pt left column
+    // + 88pt right column + this grid + spacers has to fit inside the
+    // compact page's ~354pt available width (390pt window − 18pt padding
+    // each side), and 168 doesn't — it pushed the whole row past the
+    // window edge, clipping the right almanac column off entirely. 140
+    // fits with margin to spare in both the compact page and the extended
+    // layout's fixed 400pt left pane.
+    private var gridWidth: CGFloat { large ? 140 : 92 }
 
     private var cells: [Date?] {
         guard let interval = calendar.dateInterval(of: .month, for: monthDate) else { return [] }
@@ -60,12 +69,10 @@ struct MiniMonthGrid: View {
                             .background(
                                 Circle().fill(isHighlighted ? Color.primary : Color.clear)
                             )
-                            .overlay(alignment: .bottom) {
+                            .overlay {
                                 if isMarked(d) {
                                     Circle()
-                                        .fill(isHighlighted ? DS.paper : Color.primary)
-                                        .frame(width: dotSize, height: dotSize)
-                                        .padding(.bottom, 1)
+                                        .stroke(Color.red, lineWidth: ringLineWidth)
                                 }
                             }
                     } else {

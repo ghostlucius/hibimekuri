@@ -56,45 +56,15 @@ final class TaskStore {
         save()
     }
 
-    /// Reorder is scoped to the task's own group (active or done) — nudging
-    /// never lets a task hop across that boundary.
-    func moveUp(_ id: UUID) { nudge(id, by: -1) }
-    func moveDown(_ id: UUID) { nudge(id, by: 1) }
-
-    private func nudge(_ id: UUID, by delta: Int) {
-        guard let task = tasks.first(where: { $0.id == id }) else { return }
-        var group = tasks.filter { $0.isDone == task.isDone }.sorted { $0.order < $1.order }
-        guard let idx = group.firstIndex(where: { $0.id == id }) else { return }
-        let target = idx + delta
-        guard group.indices.contains(target) else { return }
-        group.swapAt(idx, target)
+    /// Commits a reorder from `AppKitTaskTable`'s real `NSTableView`-backed
+    /// drag — `group` already reflects the final live-shifted order (the
+    /// table's own `workingItems`, not a from/to offset pair), so this
+    /// only ever reorders within that slice, never crossing the
+    /// active/done boundary (each group gets its own table instance).
+    func reorder(_ group: [TaskItem]) {
         for (position, item) in group.enumerated() {
-            if let ti = tasks.firstIndex(where: { $0.id == item.id }) {
-                tasks[ti].order = position
-            }
-        }
-        save()
-    }
-
-    /// Drag-and-drop reorder: moves `draggedId` to sit where `targetId`
-    /// currently is. Scoped to the dragged task's own group (active/done),
-    /// same rule as the old nudge buttons this replaces — a drop onto a
-    /// task in the other group is a no-op rather than crossing the boundary.
-    func move(draggedId: UUID, to targetId: UUID) {
-        guard draggedId != targetId,
-              let dragged = tasks.first(where: { $0.id == draggedId }),
-              let target = tasks.first(where: { $0.id == targetId }),
-              dragged.isDone == target.isDone else { return }
-
-        var group = tasks.filter { $0.isDone == dragged.isDone }.sorted { $0.order < $1.order }
-        guard let fromIdx = group.firstIndex(where: { $0.id == draggedId }),
-              let toIdx = group.firstIndex(where: { $0.id == targetId }) else { return }
-
-        let moved = group.remove(at: fromIdx)
-        group.insert(moved, at: toIdx)
-        for (position, item) in group.enumerated() {
-            if let ti = tasks.firstIndex(where: { $0.id == item.id }) {
-                tasks[ti].order = position
+            if let idx = tasks.firstIndex(where: { $0.id == item.id }) {
+                tasks[idx].order = position
             }
         }
         save()
