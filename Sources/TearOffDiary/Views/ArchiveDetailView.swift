@@ -43,6 +43,8 @@ struct ArchiveDetailView: View {
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
         }
+        .background(DS.paper)
+        .foregroundStyle(DS.text)
         .navigationTitle(day.fullDateLabel(language: language))
     }
 

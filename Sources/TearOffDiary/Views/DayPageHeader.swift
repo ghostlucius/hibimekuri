@@ -11,6 +11,7 @@ struct DayPageHeader: View {
     var language: AppLanguage = .japanese
 
     @Environment(TaskStore.self) private var taskStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showMonthFlip = false
     @State private var flipDegrees: Double = 0
 
@@ -21,7 +22,7 @@ struct DayPageHeader: View {
     /// the mini calendars and the flip calendar alike.
     private var dueDates: Set<Date> {
         Set(taskStore.tasks.compactMap { task -> Date? in
-            guard !task.isDone, let deferDate = task.deferDate else { return nil }
+            guard task.archivedAt == nil, !task.isDone, let deferDate = task.deferDate else { return nil }
             return Calendar.current.startOfDay(for: deferDate)
         })
     }
@@ -50,13 +51,22 @@ struct DayPageHeader: View {
     private static let numeralAreaWidth: CGFloat = 140
 
     private var numeralArea: some View {
-        Group {
-            if showMonthFlip {
-                MiniMonthGrid(monthDate: date, highlight: date, markedDates: dueDates, language: language, large: true)
-            } else {
-                numeral
+        Button {
+            toggleFlip()
+        } label: {
+            Group {
+                if showMonthFlip {
+                    MiniMonthGrid(monthDate: date, highlight: date, markedDates: dueDates, language: language, large: true)
+                } else {
+                    numeral
+                }
             }
+            .frame(width: Self.numeralAreaWidth, height: 160)
+            .rotation3DEffect(.degrees(reduceMotion ? 0 : flipDegrees), axis: (x: 0, y: 1, z: 0))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Localizer.t("月間カレンダーを切り替え", "Toggle month calendar", language: language))
         // Fixed width AND height so this slot's box is byte-for-byte
         // identical in both states. Before, only height was pinned — the
         // numeral's `.frame(maxWidth: .infinity)` let it greedily claim
@@ -67,13 +77,14 @@ struct DayPageHeader: View {
         // right side visibly slid sideways on every flip. Pinning both
         // states to one constant box removes the ambiguity entirely rather
         // than hoping the two branches happen to size themselves the same.
-        .frame(width: Self.numeralAreaWidth, height: 160)
-        .rotation3DEffect(.degrees(flipDegrees), axis: (x: 0, y: 1, z: 0))
-        .contentShape(Rectangle())
-        .onTapGesture { toggleFlip() }
     }
 
     private func toggleFlip() {
+        guard !reduceMotion else {
+            showMonthFlip.toggle()
+            flipDegrees = 0
+            return
+        }
         withAnimation(.easeIn(duration: 0.18)) {
             flipDegrees = 90
         } completion: {

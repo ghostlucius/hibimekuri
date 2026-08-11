@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// The colors in `DesignSystem.swift` are all semantic (`.textBackgroundColor`,
-/// `Color.primary`, …) so they already track the system appearance on their
-/// own — this only adds the explicit override macOS's own Settings offers,
-/// stored separately from whatever the system is currently set to.
+/// The colors in `DesignSystem.swift` resolve through `ThemeManager`, which
+/// already tracks the effective light/dark scheme on its own (see its own
+/// doc comment) — this only adds the explicit override macOS's own Settings
+/// offers, stored separately from whatever the system is currently set to.
 enum AppAppearance: String, CaseIterable, Identifiable {
     case system
     case light
@@ -49,5 +49,23 @@ enum QuoteStyle: String, CaseIterable, Identifiable {
 
     var displayName: String {
         self == .japaneseIdiom ? "Japanese idiom" : "Word of the day"
+    }
+}
+
+/// How long a deleted task stays recoverable in "Recently deleted" before
+/// `TaskStore.purgeExpiredArchivedTasks()` removes it for good.
+enum TaskRetention: Int, CaseIterable, Identifiable {
+    case fifteenDays = 15
+    case thirtyDays = 30
+    case ninetyDays = 90
+
+    var id: Int { rawValue }
+
+    func displayName(language: AppLanguage) -> String {
+        switch self {
+        case .fifteenDays: return Localizer.t("15日間", "15 days", language: language)
+        case .thirtyDays: return Localizer.t("30日間", "30 days", language: language)
+        case .ninetyDays: return Localizer.t("3ヶ月間", "3 months", language: language)
+        }
     }
 }

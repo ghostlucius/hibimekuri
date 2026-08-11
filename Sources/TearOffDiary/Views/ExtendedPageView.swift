@@ -6,12 +6,12 @@ import SwiftUI
 /// calendars. Right pane: tasks, note, idiom, tear-off button, with more
 /// room to breathe than the compact page's single column.
 ///
-/// Styled with the app's existing default look (black/white, same as the
-/// compact page) — there's no actual theme system to pick "Matcha" from
-/// yet, so this shouldn't invent a one-off green theme nobody can select
-/// (tried once, reverted per the user 2026-08-02). The dot-grid drag handle
-/// and monospace note are the only things kept from that first pass —
-/// structural/typographic choices, not color-theme ones.
+/// Styled through the same `DS`/`ThemeManager` palette as the compact page,
+/// not a one-off green theme nobody could select (an early pass invented
+/// one; reverted per the user 2026-08-02, before the real theme system
+/// existed). The dot-grid drag handle and monospace note are the only
+/// things kept from that first pass — structural/typographic choices, not
+/// color-theme ones.
 struct ExtendedPageView: View {
     @Binding var entry: DiaryEntry
     let quote: Quote?
@@ -55,6 +55,7 @@ struct ExtendedPageView: View {
         }
         .frame(maxHeight: .infinity)
         .background(DS.paper)
+        .foregroundStyle(DS.text)
     }
 
     // MARK: - Left pane (unchanged compact header + idiom, same order/
@@ -65,17 +66,37 @@ struct ExtendedPageView: View {
     // DayPageHeader above.)
 
     private var leftPane: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 12) {
-                DayPageHeader(date: entry.date, language: language)
-                HairlineDivider()
-                // Left-aligned to match compact mode's QuoteCardView
-                // exactly — centering it under the numeral (tried
-                // previously) made it inconsistent with the compact page,
-                // which was the more important match to keep.
-                DailyQuoteView(date: entry.date, quote: quote)
+        // GeometryReader + ScrollView + a `minHeight` tied to the reader's
+        // own height is the standard SwiftUI recipe for "fill the visible
+        // area when content is short, but still scroll if it overflows" —
+        // contained entirely within this one property, not threaded across
+        // files. A bare `.frame(maxHeight: .infinity)` on the illustration
+        // wouldn't work here on its own: a ScrollView proposes *unbounded*
+        // height to its content so it can measure a natural scrollable
+        // size, so a flexible child inside it never gets a real target to
+        // grow into (the same class of layout trap as the note box and the
+        // rightPane frame-chaining bug below, just a different shape).
+        GeometryReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 12) {
+                    DayPageHeader(date: entry.date, language: language)
+                    HairlineDivider()
+                    // Left-aligned to match compact mode's QuoteCardView
+                    // exactly — centering it under the numeral (tried
+                    // previously) made it inconsistent with the compact
+                    // page, which was the more important match to keep.
+                    DailyQuoteView(date: entry.date, quote: quote)
+                    // Every theme has its own recolor of the same mountain
+                    // vector — see DiaryIllustrationView. Fills whatever
+                    // space is left below the quote card, cropped (not
+                    // letterboxed) so it always covers the remaining
+                    // rectangle edge to edge.
+                    DiaryIllustrationView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .padding(20)
+                .frame(minHeight: proxy.size.height)
             }
-            .padding(20)
         }
     }
 
@@ -137,6 +158,8 @@ struct ExtendedPageView: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .menuStyle(.borderlessButton)
                 // SwiftUI draws its own disclosure arrow next to any custom
@@ -145,8 +168,8 @@ struct ExtendedPageView: View {
                 // ellipsis icon. This is the only supported way to turn it
                 // off; the icon alone already reads as "more options".
                 .menuIndicator(.hidden)
-                .frame(width: 20)
                 .help(Localizer.t("その他のオプション", "More options", language: language))
+                .accessibilityLabel(Localizer.t("その他のオプション", "More options", language: language))
             }
 
             Group {
@@ -155,6 +178,7 @@ struct ExtendedPageView: View {
                         .font(.system(size: 12, design: .monospaced))
                         .scrollContentBackground(.hidden)
                         .focused($noteFocused)
+                        .accessibilityLabel(Localizer.t("メモ", "Note", language: language))
                         // Only grabs focus when isEditingNote flips true
                         // (tapping the rendered preview below) — never on
                         // mere appearance, which stole keystrokes typed
@@ -175,13 +199,18 @@ struct ExtendedPageView: View {
                             if !focused { isEditingNote = false }
                         }
                 } else {
-                    ScrollView {
-                        Text(renderedNote)
-                            .font(.system(size: 12, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    Button {
+                        isEditingNote = true
+                    } label: {
+                        ScrollView {
+                            Text(renderedNote)
+                                .font(.system(size: 12, design: .monospaced))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .contentShape(Rectangle())
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture { isEditingNote = true }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Localizer.t("メモを編集", "Edit note", language: language))
                 }
             }
             .padding(6)
@@ -198,11 +227,14 @@ struct ExtendedPageView: View {
                 } label: {
                     Image(systemName: "calendar")
                         .font(.system(size: 12))
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .disabled(onJumpToToday == nil)
                 .help(Localizer.t("今日にジャンプ", "Jump to today", language: language))
+                .accessibilityLabel(Localizer.t("今日にジャンプ", "Jump to today", language: language))
 
                 Spacer()
 
@@ -211,20 +243,26 @@ struct ExtendedPageView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(onPrevDay == nil ? Color.secondary.opacity(0.3) : Color.secondary)
+                .foregroundStyle(onPrevDay == nil ? DS.textSecondary.opacity(0.3) : DS.textSecondary)
                 .disabled(onPrevDay == nil)
+                .accessibilityLabel(Localizer.t("前の日", "Previous day", language: language))
 
                 Button {
                     onNextDay?()
                 } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(onNextDay == nil ? Color.secondary.opacity(0.3) : Color.secondary)
+                .foregroundStyle(onNextDay == nil ? DS.textSecondary.opacity(0.3) : DS.textSecondary)
                 .disabled(onNextDay == nil)
+                .accessibilityLabel(Localizer.t("次の日", "Next day", language: language))
             }
         }
     }
@@ -241,7 +279,7 @@ struct ExtendedPageView: View {
                         Spacer()
                     }
                     .padding(.vertical, 10)
-                    .overlay(Rectangle().stroke(Color.primary, lineWidth: 1))
+                    .overlay(Rectangle().stroke(DS.text, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -258,6 +296,7 @@ private struct ExtendedTaskSection: View {
     let language: AppLanguage
 
     @Environment(TaskStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var newTaskText = ""
     // Single-optional, not a Set — only one task is ever open at a time.
     @State private var expandedTaskID: UUID?
@@ -265,11 +304,11 @@ private struct ExtendedTaskSection: View {
     @State private var showDeferred = false
     @FocusState private var fieldFocused: Bool
 
-    private var visibleTasks: [TaskItem] { store.tasks.filter { !isDeferred($0) } }
+    private var visibleTasks: [TaskItem] { store.tasks.filter { $0.archivedAt == nil && !isDeferred($0) } }
     private var activeTasks: [TaskItem] { visibleTasks.filter { !$0.isDone }.sorted { $0.order < $1.order } }
     private var doneTasks: [TaskItem] { visibleTasks.filter { $0.isDone }.sorted { $0.order < $1.order } }
     private var deferredTasks: [TaskItem] {
-        store.tasks.filter { isDeferred($0) }.sorted { ($0.deferDate ?? .distantFuture) < ($1.deferDate ?? .distantFuture) }
+        store.tasks.filter { $0.archivedAt == nil && isDeferred($0) }.sorted { ($0.deferDate ?? .distantFuture) < ($1.deferDate ?? .distantFuture) }
     }
 
     private func isDeferred(_ task: TaskItem) -> Bool {
@@ -296,10 +335,12 @@ private struct ExtendedTaskSection: View {
                 Button { fieldFocused = true } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 10, weight: .bold))
-                        .frame(width: 18, height: 18)
-                        .overlay(Circle().stroke(Color.primary.opacity(0.5), lineWidth: 1))
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                        .overlay(Circle().stroke(DS.text.opacity(0.5), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Localizer.t("タスクを追加", "Add a task", language: language))
             }
 
             if !activeTasks.isEmpty {
@@ -328,7 +369,7 @@ private struct ExtendedTaskSection: View {
 
             if !deferredTasks.isEmpty {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) { showDeferred.toggle() }
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { showDeferred.toggle() }
                 } label: {
                     Text(Localizer.t("＋\(deferredTasks.count)件 予定あり", "+\(deferredTasks.count) scheduled", language: language))
                         .font(.system(size: 10))
@@ -377,6 +418,7 @@ private struct ExtendedTaskRow: View {
     let onSelect: () -> Void
 
     @Environment(TaskStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var newStepText = ""
     @State private var showDatePicker = false
     @State private var pendingDeferDate = Date()
@@ -427,13 +469,18 @@ private struct ExtendedTaskRow: View {
             // not less. Same single-line shape as the compact TaskRow now.
             HStack(spacing: 8) {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.12)) { store.toggleDone(task.id) }
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.12)) { store.toggleDone(task.id) }
                 } label: {
                     Image(systemName: task.isDone ? "checkmark.square.fill" : "square")
                         .font(.system(size: 13))
-                        .foregroundStyle(task.isDone ? Color.primary : Color.secondary)
+                        .foregroundStyle(task.isDone ? DS.text : DS.textSecondary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(task.isDone
+                    ? Localizer.t("タスクを未完了にする", "Mark task incomplete", language: language)
+                    : Localizer.t("タスクを完了", "Complete task", language: language))
 
                 titleView
 
@@ -442,7 +489,7 @@ private struct ExtendedTaskRow: View {
                 if let badge = deferBadge {
                     Text(badge.text)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(badge.isOverdue ? Color.red : Color.secondary)
+                        .foregroundStyle(badge.isOverdue ? Color.red : DS.textSecondary)
                 }
                 if !task.checklist.isEmpty {
                     Text(verbatim: "\(task.checklist.filter { $0.isDone }.count)/\(task.checklist.count)")
@@ -454,8 +501,11 @@ private struct ExtendedTaskRow: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Localizer.t("タスクを削除", "Delete task", language: language))
             }
             .padding(.vertical, 3)
             .padding(.horizontal, 4)
@@ -465,10 +515,7 @@ private struct ExtendedTaskRow: View {
             // Double-click always opens (never toggles closed) — closing
             // only happens by clicking elsewhere (see taskInteractionReset).
             .onTapGesture(count: 2) {
-                onOpen()
-                if !task.isDone {
-                    isEditingTitle = true
-                }
+                startRename()
             }
             .onTapGesture(count: 1) {
                 guard !isEditingTitle else { return }
@@ -490,17 +537,26 @@ private struct ExtendedTaskRow: View {
                             } label: {
                                 Image(systemName: item.isDone ? "checkmark.square" : "square")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(item.isDone ? Color.primary : Color.secondary)
+                                    .foregroundStyle(item.isDone ? DS.text : DS.textSecondary)
+                                    .frame(width: 20, height: 20)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(item.isDone
+                                ? Localizer.t("ステップを未完了にする", "Mark step incomplete", language: language)
+                                : Localizer.t("ステップを完了", "Complete step", language: language))
                             Text(item.title)
                                 .font(.system(size: 12))
                                 .strikethrough(item.isDone)
                             Spacer()
                             Button { store.deleteChecklistItem(taskId: task.id, itemId: item.id) } label: {
-                                Image(systemName: "xmark").font(.system(size: 9))
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9))
+                                    .frame(width: 20, height: 20)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(Localizer.t("ステップを削除", "Delete step", language: language))
                         }
                     }
 
@@ -535,18 +591,22 @@ private struct ExtendedTaskRow: View {
                 if let badge = deferBadge {
                     Text(badge.text)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(badge.isOverdue ? Color.red : Color.secondary)
+                        .foregroundStyle(badge.isOverdue ? Color.red : DS.textSecondary)
                 }
                 Button(action: clearDefer) {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Localizer.t("日付を消去", "Clear date", language: language))
             } else if showDatePicker {
                 DatePicker("", selection: $pendingDeferDate, in: Date()..., displayedComponents: .date)
                     .labelsHidden()
                     .font(.system(size: 11))
+                    .accessibilityLabel(Localizer.t("締め切り日", "Due date", language: language))
                 Button(Localizer.t("設定", "Set", language: language)) {
                     var updated = task
                     updated.deferDate = Calendar.current.startOfDay(for: pendingDeferDate)
@@ -575,10 +635,16 @@ private struct ExtendedTaskRow: View {
                 Text(task.title)
                     .strikethrough(true)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel(task.title)
+                .accessibilityAction(named: Localizer.t("詳細を表示", "Show details", language: language)) {
+                    onOpen()
+                }
             } else if isEditingTitle {
                 TextField("", text: titleBinding)
                     .textFieldStyle(.plain)
                     .focused($titleFocused)
+                    .accessibilityLabel(Localizer.t("タスク名", "Task title", language: language))
                     .onChange(of: isEditingTitle, initial: true) { _, editing in
                         if editing {
                             DispatchQueue.main.async { titleFocused = true }
@@ -591,6 +657,14 @@ private struct ExtendedTaskRow: View {
                     }
             } else {
                 Text(task.title)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel(task.title)
+                .accessibilityAction(named: Localizer.t("詳細を表示", "Show details", language: language)) {
+                    onOpen()
+                }
+                .accessibilityAction(named: Localizer.t("名前を変更", "Rename task", language: language)) {
+                    startRename()
+                }
             }
         }
         .font(.system(size: 13))
@@ -598,6 +672,13 @@ private struct ExtendedTaskRow: View {
             if !expanded {
                 isEditingTitle = false
             }
+        }
+    }
+
+    private func startRename() {
+        onOpen()
+        if !task.isDone {
+            isEditingTitle = true
         }
     }
 }

@@ -1,13 +1,19 @@
 import SwiftUI
+import AppKit
 
 struct TodayView: View {
+    var catchUpRequestID = 0
+
     @Environment(DiaryStore.self) private var store
     @Environment(QuoteStore.self) private var quoteStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
 
     @State private var currentDate: Date = DiaryEntry.startOfDay(Date())
     @State private var revealDate: Date?
     @State private var isTearing = false
     @State private var scrollPositionID: Date?
+    @State private var handledCatchUpRequestID = 0
 
     /// How far ahead of the current page you can scroll to peek/jot a note
     /// (three weeks is plenty for "remind me next week" without generating
@@ -35,8 +41,14 @@ struct TodayView: View {
             .scrollPosition(id: $scrollPositionID)
             .scrollIndicators(.hidden)
         }
-        .background(Color(nsColor: .windowBackgroundColor).ignoresSafeArea())
-        .task { setUpCurrentDate() }
+        .background(DS.paper.ignoresSafeArea())
+        .task(id: catchUpRequestID) {
+            setUpCurrentDate()
+            if catchUpRequestID != 0, handledCatchUpRequestID != catchUpRequestID {
+                handledCatchUpRequestID = catchUpRequestID
+                catchUpToToday()
+            }
+        }
         .onChange(of: currentDate) { _, newValue in
             scrollPositionID = newValue
         }
@@ -80,13 +92,13 @@ struct TodayView: View {
                 onJumpToToday: jumpToTodayAction(from: currentDate)
             )
             .rotation3DEffect(
-                .degrees(isTearing ? -26 : 0),
+                .degrees(!reduceMotion && isTearing ? -26 : 0),
                 axis: (x: 0, y: 0, z: 1),
                 anchor: .topLeading
             )
-            .offset(x: isTearing ? -70 : 0, y: isTearing ? -560 : 0)
+            .offset(x: !reduceMotion && isTearing ? -70 : 0, y: !reduceMotion && isTearing ? -560 : 0)
             .opacity(isTearing ? 0 : 1)
-            .shadow(color: .black.opacity(isTearing ? 0.25 : 0), radius: 16, y: 10)
+            .shadow(color: .black.opacity(!reduceMotion && isTearing ? 0.25 : 0), radius: 16, y: 10)
         }
     }
 
@@ -137,24 +149,67 @@ struct TodayView: View {
     }
 
     private func performTearOff() {
+        SoundEffects.shared.playTearOff()
+        tearOffCurrentPage(duration: 0.5)
+    }
+
+    /// Shared by the normal single-day tear and the rapid catch-up
+    /// sequence below — they only differ in timing and whether they chain
+    /// into another tear on completion. Doesn't play the sound itself;
+    /// callers decide (the catch-up sequence plays it once for the whole
+    /// run, not once per page).
+    private func tearOffCurrentPage(duration: Double, completion: (() -> Void)? = nil) {
         guard var entry = store.entry(for: currentDate), !entry.isCompleted, !isTearing else { return }
 
         let nextDate = Calendar.current.date(byAdding: .day, value: 1, to: currentDate).map(DiaryEntry.startOfDay) ?? currentDate
         store.ensureEntry(for: nextDate, quoteStore: quoteStore)
         revealDate = nextDate
 
-        SoundEffects.shared.playTearOff()
-
-        withAnimation(.easeIn(duration: 0.5)) {
+        let effectiveDuration = reduceMotion ? 0.01 : duration
+        withAnimation(reduceMotion ? .linear(duration: effectiveDuration) : .easeIn(duration: effectiveDuration)) {
             isTearing = true
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + effectiveDuration) {
             entry.isCompleted = true
             entry.completedAt = Date()
             store.upsert(entry)
             currentDate = nextDate
             revealDate = nil
             isTearing = false
+            completion?()
         }
+    }
+
+    /// Rapidly tears through every backlog day between the current
+    /// frontier (see `DiaryStore.currentDate()`'s doc comment for why
+    /// that can drift behind the real calendar date) and today, landing
+    /// on today as the new, editable current page. Each page gets a much
+    /// shorter animation than a normal tear so catching up several days
+    /// doesn't take several seconds, and the tear sound plays once for
+    /// the whole run rather than once per page.
+    private func catchUpToToday() {
+        guard !isTearing else { return }
+        let realToday = DiaryEntry.startOfDay(Date())
+        guard currentDate < realToday else { return }
+        SoundEffects.shared.playTearOff()
+        tearCatchUpPage(until: realToday)
+    }
+
+    private func tearCatchUpPage(until realToday: Date) {
+        guard currentDate < realToday else {
+            announceCatchUpComplete()
+            return
+        }
+        tearOffCurrentPage(duration: 0.18) {
+            tearCatchUpPage(until: realToday)
+        }
+    }
+
+    private func announceCatchUpComplete() {
+        NSAccessibility.post(
+            element: NSApp.mainWindow as Any,
+            notification: .announcementRequested,
+            userInfo: [.announcement: Localizer.t("今日まで追いつきました。", "Caught up to today.", language: language)]
+        )
     }
 }

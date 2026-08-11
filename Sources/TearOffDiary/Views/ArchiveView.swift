@@ -4,11 +4,22 @@ struct ArchiveView: View {
     @Environment(DiaryStore.self) private var store
     @Environment(QuoteStore.self) private var quoteStore
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @State private var searchText = ""
 
     private var pastEntries: [DiaryEntry] {
         store.entries
             .filter { $0.isCompleted }
             .sorted { $0.date > $1.date }
+    }
+
+    private var filteredEntries: [DiaryEntry] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return pastEntries }
+        return pastEntries.filter { entry in
+            let dateLabel = CalendarDay(date: entry.date).fullDateLabel(language: language)
+            return entry.journalText.localizedCaseInsensitiveContains(query)
+                || dateLabel.localizedCaseInsensitiveContains(query)
+        }
     }
 
     var body: some View {
@@ -19,8 +30,10 @@ struct ArchiveView: View {
                     systemImage: "square.stack",
                     description: Text(Localizer.t("切り取ったページがここに表示されます。", "Torn-off pages will appear here.", language: language))
                 )
+            } else if filteredEntries.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             } else {
-                List(pastEntries) { entry in
+                List(filteredEntries) { entry in
                     NavigationLink {
                         ArchiveDetailView(entry: entry, quote: quoteStore.quote(withId: entry.quoteId))
                     } label: {
@@ -30,7 +43,13 @@ struct ArchiveView: View {
                 .listStyle(.inset)
             }
         }
+        .searchable(
+            text: $searchText,
+            placement: .automatic,
+            prompt: Localizer.t("記録または日付を検索", "Search entries or dates", language: language)
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .foregroundStyle(DS.text)
         .navigationTitle(Localizer.t("アーカイブ", "Archive", language: language))
     }
 }
@@ -65,6 +84,7 @@ private struct ArchiveRow: View {
             Image(systemName: "checkmark.seal.fill")
                 .foregroundStyle(.secondary)
                 .font(.system(size: 12))
+                .accessibilityHidden(true)
         }
         .padding(.vertical, 4)
     }

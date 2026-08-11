@@ -6,6 +6,7 @@ import SwiftUI
 /// and a "do later" defer date.
 struct TaskListView: View {
     @Environment(TaskStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
     @State private var newTaskText = ""
     // Single-optional, not a Set — only one task is ever open at a time
@@ -17,7 +18,7 @@ struct TaskListView: View {
     @FocusState private var fieldFocused: Bool
 
     private var visibleTasks: [TaskItem] {
-        store.tasks.filter { !isDeferred($0) }
+        store.tasks.filter { $0.archivedAt == nil && !isDeferred($0) }
     }
 
     private var activeTasks: [TaskItem] {
@@ -29,7 +30,7 @@ struct TaskListView: View {
     }
 
     private var deferredTasks: [TaskItem] {
-        store.tasks.filter { isDeferred($0) }.sorted { ($0.deferDate ?? .distantFuture) < ($1.deferDate ?? .distantFuture) }
+        store.tasks.filter { $0.archivedAt == nil && isDeferred($0) }.sorted { ($0.deferDate ?? .distantFuture) < ($1.deferDate ?? .distantFuture) }
     }
 
     private func isDeferred(_ task: TaskItem) -> Bool {
@@ -95,7 +96,7 @@ struct TaskListView: View {
 
             if !deferredTasks.isEmpty {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) { showDeferred.toggle() }
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { showDeferred.toggle() }
                 } label: {
                     Text(Localizer.t("＋\(deferredTasks.count)件 予定あり", "+\(deferredTasks.count) scheduled", language: language))
                         .font(.system(size: 10))
@@ -146,6 +147,7 @@ struct TaskListView: View {
 /// which made the row's move/delete/expand controls very easy to miss.
 private struct IconButton: View {
     let systemName: String
+    let accessibilityLabel: String
     var size: CGFloat = 9
     var weight: Font.Weight = .semibold
     var color: Color = .secondary
@@ -162,6 +164,7 @@ private struct IconButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 
@@ -173,6 +176,7 @@ private struct TaskRow: View {
     let onSelect: () -> Void
 
     @Environment(TaskStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
     @State private var newStepText = ""
     @State private var showDatePicker = false
@@ -228,8 +232,15 @@ private struct TaskRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                IconButton(systemName: task.isDone ? "checkmark.square.fill" : "square", size: 12, color: task.isDone ? .primary : .secondary) {
-                    withAnimation(.easeInOut(duration: 0.12)) {
+                IconButton(
+                    systemName: task.isDone ? "checkmark.square.fill" : "square",
+                    accessibilityLabel: task.isDone
+                        ? Localizer.t("タスクを未完了にする", "Mark task incomplete", language: language)
+                        : Localizer.t("タスクを完了", "Complete task", language: language),
+                    size: 12,
+                    color: task.isDone ? .primary : .secondary
+                ) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.12)) {
                         store.toggleDone(task.id)
                     }
                 }
@@ -241,7 +252,7 @@ private struct TaskRow: View {
                 if let badge = deferBadge {
                     Text(badge.text)
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(badge.isOverdue ? Color.red : Color.secondary)
+                        .foregroundStyle(badge.isOverdue ? Color.red : DS.textSecondary)
                 }
 
                 if !task.checklist.isEmpty {
@@ -250,7 +261,12 @@ private struct TaskRow: View {
                         .foregroundStyle(.tertiary)
                 }
 
-                IconButton(systemName: "xmark", size: 10, color: .secondary) { store.delete(task.id) }
+                IconButton(
+                    systemName: "xmark",
+                    accessibilityLabel: Localizer.t("タスクを削除", "Delete task", language: language),
+                    size: 10,
+                    color: .secondary
+                ) { store.delete(task.id) }
             }
             .padding(.vertical, 3)
             .padding(.horizontal, 4)
@@ -260,10 +276,7 @@ private struct TaskRow: View {
             // Double-click always opens (never toggles closed) — closing
             // only happens by clicking elsewhere (see taskInteractionReset).
             .onTapGesture(count: 2) {
-                onOpen()
-                if !task.isDone {
-                    isEditingTitle = true
-                }
+                startRename()
             }
             .onTapGesture(count: 1) {
                 guard !isEditingTitle else { return }
@@ -281,7 +294,14 @@ private struct TaskRow: View {
 
                     ForEach(task.checklist) { item in
                         HStack(spacing: 4) {
-                            IconButton(systemName: item.isDone ? "checkmark.square" : "square", size: 11, color: item.isDone ? .primary : .secondary) {
+                            IconButton(
+                                systemName: item.isDone ? "checkmark.square" : "square",
+                                accessibilityLabel: item.isDone
+                                    ? Localizer.t("ステップを未完了にする", "Mark step incomplete", language: language)
+                                    : Localizer.t("ステップを完了", "Complete step", language: language),
+                                size: 11,
+                                color: item.isDone ? .primary : .secondary
+                            ) {
                                 store.toggleChecklistItem(taskId: task.id, itemId: item.id)
                             }
 
@@ -292,7 +312,11 @@ private struct TaskRow: View {
 
                             Spacer()
 
-                            IconButton(systemName: "xmark", size: 9) {
+                            IconButton(
+                                systemName: "xmark",
+                                accessibilityLabel: Localizer.t("ステップを削除", "Delete step", language: language),
+                                size: 9
+                            ) {
                                 store.deleteChecklistItem(taskId: task.id, itemId: item.id)
                             }
                         }
@@ -331,13 +355,19 @@ private struct TaskRow: View {
                 if let badge = deferBadge {
                     Text(badge.text)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(badge.isOverdue ? Color.red : Color.secondary)
+                        .foregroundStyle(badge.isOverdue ? Color.red : DS.textSecondary)
                 }
-                IconButton(systemName: "xmark", size: 9, action: clearDefer)
+                IconButton(
+                    systemName: "xmark",
+                    accessibilityLabel: Localizer.t("日付を消去", "Clear date", language: language),
+                    size: 9,
+                    action: clearDefer
+                )
             } else if showDatePicker {
                 DatePicker("", selection: $pendingDeferDate, in: Date()..., displayedComponents: .date)
                     .labelsHidden()
                     .font(.system(size: 11))
+                    .accessibilityLabel(Localizer.t("締め切り日", "Due date", language: language))
                 Button(Localizer.t("設定", "Set", language: language)) {
                     var updated = task
                     updated.deferDate = Calendar.current.startOfDay(for: pendingDeferDate)
@@ -374,11 +404,17 @@ private struct TaskRow: View {
                 Text(task.title)
                     .strikethrough(true)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel(task.title)
+                .accessibilityAction(named: Localizer.t("詳細を表示", "Show details", language: language)) {
+                    onOpen()
+                }
             } else if isEditingTitle {
                 TextField("", text: titleBinding)
                     .textFieldStyle(.plain)
                     .foregroundStyle(.primary)
                     .focused($titleFocused)
+                    .accessibilityLabel(Localizer.t("タスク名", "Task title", language: language))
                     // Deferred to the next run-loop turn, not set
                     // synchronously — double-click fires onOpen() (which
                     // expands the whole notes/checklist section below, a
@@ -403,6 +439,14 @@ private struct TaskRow: View {
             } else {
                 Text(task.title)
                     .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel(task.title)
+                .accessibilityAction(named: Localizer.t("詳細を表示", "Show details", language: language)) {
+                    onOpen()
+                }
+                .accessibilityAction(named: Localizer.t("名前を変更", "Rename task", language: language)) {
+                    startRename()
+                }
             }
         }
         .font(.system(size: 12))
@@ -418,6 +462,13 @@ private struct TaskRow: View {
             if !expanded {
                 isEditingTitle = false
             }
+        }
+    }
+
+    private func startRename() {
+        onOpen()
+        if !task.isDone {
+            isEditingTitle = true
         }
     }
 }

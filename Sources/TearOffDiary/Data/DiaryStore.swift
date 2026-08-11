@@ -1,32 +1,73 @@
 import Foundation
+import AppKit
 
+@MainActor
 @Observable
 final class DiaryStore {
     private(set) var entries: [DiaryEntry] = []
     private(set) var storageDirectory: URL
+    private(set) var storageIssueMessage: String?
 
     private var fileURL: URL
+    private var saveTask: Task<Void, Never>?
+    private var saveSuspended = false
+    private var terminateObserver: NSObjectProtocol?
 
     init() {
         let dir = StorageLocation.activeDirectory
         storageDirectory = dir
         fileURL = dir.appendingPathComponent("entries.json")
         load()
+        terminateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.flushPendingSave()
+            }
+        }
     }
 
-    /// Re-points the store at wherever it should live after the iCloud
-    /// setting changes, carrying the already-loaded data across (it's the
-    /// freshest copy we have) and removing the stale file left behind at
-    /// the old location rather than orphaning it.
+    /// Re-points the store after the iCloud setting changes without blindly
+    /// overwriting whatever already exists at the destination. If both sides
+    /// have data, merge by calendar day and back up both files first.
     func relocateStorage() {
         let newDir = StorageLocation.activeDirectory
         let newURL = newDir.appendingPathComponent("entries.json")
         guard newURL != fileURL else { return }
+
         let oldURL = fileURL
+        saveTask?.cancel()
+
+        do {
+            let destinationEntries = try JSONFilePersistence.loadArray([DiaryEntry].self, from: newURL)
+            let preferDestination = (JSONFilePersistence.modificationDate(for: newURL) ?? .distantPast)
+                > (JSONFilePersistence.modificationDate(for: oldURL) ?? .distantPast)
+            let merged = mergedEntries(current: entries, destination: destinationEntries, preferDestinationConflicts: preferDestination)
+
+            _ = try JSONFilePersistence.backupExistingFile(at: oldURL, reason: "before-move")
+            _ = try JSONFilePersistence.backupExistingFile(at: newURL, reason: "before-merge")
+            try JSONFilePersistence.writeArraySynchronously(merged, to: newURL)
+
+            entries = merged
+            storageIssueMessage = nil
+            saveSuspended = false
+        } catch {
+            storageIssueMessage = JSONFilePersistence.message(for: error, fileName: "entries.json", language: currentLanguage)
+            saveSuspended = true
+            return
+        }
+
         fileURL = newURL
         storageDirectory = newDir
-        save()
-        try? FileManager.default.removeItem(at: oldURL)
+        do {
+            try FileManager.default.removeItem(at: oldURL)
+        } catch {
+            storageIssueMessage = Localizer.t(
+                "古い entries.json を削除できませんでした。データは新しい保存先にコピー済みです。",
+                "Couldn't remove the old entries.json. Your data was copied to the new storage location.",
+                language: currentLanguage
+            )
+        }
     }
 
     func entry(for date: Date) -> DiaryEntry? {
@@ -43,7 +84,7 @@ final class DiaryStore {
         let quote = quoteStore.quote(for: target)
         let new = DiaryEntry(date: target, quoteId: quote?.id ?? "")
         entries.append(new)
-        save()
+        scheduleSave()
         return new
     }
 
@@ -68,21 +109,80 @@ final class DiaryStore {
         } else {
             entries.append(entry)
         }
-        save()
+        scheduleSave()
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: fileURL) else { return }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        entries = (try? decoder.decode([DiaryEntry].self, from: data)) ?? []
+        do {
+            entries = try JSONFilePersistence.loadArray([DiaryEntry].self, from: fileURL)
+            storageIssueMessage = nil
+            saveSuspended = false
+        } catch {
+            do {
+                _ = try JSONFilePersistence.backupExistingFile(at: fileURL, reason: "unreadable")
+                entries = []
+                storageIssueMessage = Localizer.t(
+                    "entries.json を読み込めませんでした。元ファイルをバックアップし、新しい記録として開始しました。",
+                    "Couldn't read entries.json. The original file was backed up and the app started a fresh entries file.",
+                    language: currentLanguage
+                )
+                saveSuspended = false
+            } catch {
+                entries = []
+                storageIssueMessage = JSONFilePersistence.message(for: error, fileName: "entries.json", language: currentLanguage)
+                saveSuspended = true
+            }
+        }
     }
 
-    private func save() {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(entries) else { return }
-        try? data.write(to: fileURL, options: .atomic)
+    private func scheduleSave() {
+        guard !saveSuspended else { return }
+        saveTask?.cancel()
+        let snapshot = entries
+        let targetURL = fileURL
+        saveTask = Task { [weak self, snapshot, targetURL] in
+            do {
+                try await Task.sleep(nanoseconds: 350_000_000)
+                try await JSONFilePersistence.writeArray(snapshot, to: targetURL)
+                self?.storageIssueMessage = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                self?.storageIssueMessage = JSONFilePersistence.message(for: error, fileName: "entries.json", language: self?.currentLanguage ?? .japanese)
+            }
+        }
+    }
+
+    func flushPendingSave() {
+        guard !saveSuspended else { return }
+        saveTask?.cancel()
+        do {
+            try JSONFilePersistence.writeArraySynchronously(entries, to: fileURL)
+            storageIssueMessage = nil
+        } catch {
+            storageIssueMessage = JSONFilePersistence.message(for: error, fileName: "entries.json", language: currentLanguage)
+        }
+    }
+
+    private var currentLanguage: AppLanguage {
+        let raw = UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.japanese.rawValue
+        return AppLanguage(rawValue: raw) ?? .japanese
+    }
+
+    private func mergedEntries(
+        current: [DiaryEntry],
+        destination: [DiaryEntry],
+        preferDestinationConflicts: Bool
+    ) -> [DiaryEntry] {
+        var byDate = Dictionary(uniqueKeysWithValues: destination.map { (DiaryEntry.startOfDay($0.date), $0) })
+        for entry in current {
+            let key = DiaryEntry.startOfDay(entry.date)
+            if let existing = byDate[key] {
+                byDate[key] = preferDestinationConflicts ? existing : entry
+            } else {
+                byDate[key] = entry
+            }
+        }
+        return byDate.values.sorted { $0.date < $1.date }
     }
 }

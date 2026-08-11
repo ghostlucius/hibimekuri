@@ -46,6 +46,17 @@ struct MiniMonthGrid: View {
         markedDates.contains(calendar.startOfDay(for: d))
     }
 
+    private func accessibilityLabel(for date: Date, isHighlighted: Bool, isMarked: Bool) -> String {
+        var parts = [CalendarDay(date: date).fullDateLabel(language: language)]
+        if isHighlighted {
+            parts.append(Localizer.t("選択中", "selected", language: language))
+        }
+        if isMarked {
+            parts.append(Localizer.t("締め切り日", "due date", language: language))
+        }
+        return parts.joined(separator: ", ")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(Localizer.month(number: calendar.component(.month, from: monthDate), language: language))
@@ -62,23 +73,33 @@ struct MiniMonthGrid: View {
                 ForEach(cells.indices, id: \.self) { idx in
                     if let d = cells[idx] {
                         let isHighlighted = highlight.map { calendar.isDate($0, inSameDayAs: d) } ?? false
+                        let isDueDate = isMarked(d)
                         Text(verbatim: "\(calendar.component(.day, from: d))")
                             .font(.system(size: dayFont))
                             .frame(maxWidth: .infinity, minHeight: cellMinHeight)
                             .foregroundStyle(isHighlighted ? DS.paper : .secondary)
                             .background(
-                                Circle().fill(isHighlighted ? Color.primary : Color.clear)
+                                Circle().fill(isHighlighted ? DS.text : Color.clear)
                             )
                             .overlay {
-                                if isMarked(d) {
-                                    Circle()
-                                        .stroke(Color.red, lineWidth: ringLineWidth)
+                                if isDueDate {
+                                    ZStack {
+                                        Circle()
+                                            .stroke(Color.red, lineWidth: ringLineWidth)
+                                        Circle()
+                                            .fill(Color.red)
+                                            .frame(width: large ? 3.6 : 2.6, height: large ? 3.6 : 2.6)
+                                            .offset(y: cellMinHeight * 0.32)
+                                    }
                                 }
                             }
+                            .accessibilityLabel(accessibilityLabel(for: d, isHighlighted: isHighlighted, isMarked: isDueDate))
+                            .accessibilityAddTraits(isHighlighted ? .isSelected : [])
                     } else {
                         Text("")
                             .font(.system(size: dayFont))
                             .frame(maxWidth: .infinity, minHeight: cellMinHeight)
+                            .accessibilityHidden(true)
                     }
                 }
             }

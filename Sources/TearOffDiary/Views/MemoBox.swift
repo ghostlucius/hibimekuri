@@ -58,6 +58,7 @@ struct MemoBox: View {
                         .focused($isFocused)
                         .padding(.leading, -5)
                         .frame(minHeight: 70)
+                        .accessibilityLabel(Localizer.t("メモ", "Memo", language: language))
                         // Only grabs focus in response to isEditing flipping
                         // true (tapping the rendered preview below) — never
                         // on mere appearance, which was stealing keystrokes
@@ -81,16 +82,21 @@ struct MemoBox: View {
                             if !focused { isEditing = false }
                         }
                 } else {
-                    Text(renderedMarkdown)
-                        .font(.system(size: 12))
-                        .foregroundStyle(isEditable ? .primary : .secondary)
-                        .frame(minHeight: 70, alignment: .topLeading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            guard isEditable else { return }
+                    Button {
+                        if isEditable {
                             isEditing = true
                         }
+                    } label: {
+                        Text(renderedMarkdown)
+                            .font(.system(size: 12))
+                            .foregroundStyle(isEditable ? .primary : .secondary)
+                            .frame(minHeight: 70, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isEditable)
+                    .accessibilityLabel(Localizer.t("メモを編集", "Edit memo", language: language))
                 }
             }
             .padding(6)

@@ -7,6 +7,19 @@ import Foundation
 struct CalendarDay {
     let date: Date
 
+    private static let englishFullDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d, yyyy"
+        formatter.locale = Locale(identifier: "en_US")
+        return formatter
+    }()
+
+    private static let japaneseFullDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年 M月 d日"
+        return formatter
+    }()
+
     var dayNumber: String {
         String(Calendar.current.component(.day, from: date))
     }
@@ -55,14 +68,9 @@ struct CalendarDay {
 
     func fullDateLabel(language: AppLanguage) -> String {
         if language == .english {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "MMMM d, yyyy"
-            formatter.locale = Locale(identifier: "en_US")
-            return formatter.string(from: date)
+            return Self.englishFullDateFormatter.string(from: date)
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年 M月 d日"
-        return formatter.string(from: date)
+        return Self.japaneseFullDateFormatter.string(from: date)
     }
 
     var isToday: Bool {

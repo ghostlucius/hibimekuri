@@ -11,6 +11,7 @@ struct MarkdownNotesField: View {
     @Binding var text: String
     var placeholder: String
 
+    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
     @State private var isEditing = false
     @FocusState private var isFocused: Bool
 
@@ -41,10 +42,15 @@ struct MarkdownNotesField: View {
                         if !focused { isEditing = false }
                     }
             } else {
-                Text(rendered)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onTapGesture { isEditing = true }
+                Button {
+                    isEditing = true
+                } label: {
+                    Text(rendered)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Localizer.t("メモを編集", "Edit notes", language: language))
             }
         }
         .font(.system(size: 12))

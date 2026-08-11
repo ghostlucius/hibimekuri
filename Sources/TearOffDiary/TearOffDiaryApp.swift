@@ -35,6 +35,7 @@ enum WindowMetrics {
 /// click outside a specific row" from the AppKit layer.
 extension Notification.Name {
     static let taskInteractionReset = Notification.Name("taskInteractionReset")
+    static let taskNotificationAuthorizationChanged = Notification.Name("taskNotificationAuthorizationChanged")
 }
 
 /// `swift run` launches this without a proper .app bundle, so AppKit never
@@ -45,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppearanceController.applyStoredPreference()
         AppIconManager.start()
+        TaskNotificationScheduler.requestAuthorization()
         installFocusResignOnOutsideClick()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -74,6 +76,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.setContentSize(WindowMetrics.defaultSize)
         }
         NSApp.windows.first?.makeKeyAndOrderFront(nil)
+        if let window = NSApp.windows.first {
+            // Confirmed via debug logging: SwiftUI's WindowGroup, in this
+            // configuration, hands back a window whose `collectionBehavior`
+            // already has `.fullScreenNone` set and whose `styleMask` is
+            // missing `.fullScreen` entirely — the native fullscreen
+            // affordance never engages (the green button's hover-arrows
+            // icon and Cmd+Ctrl+F both silently no-op) even though nothing
+            // in this file ever asked for that. Overriding both explicitly
+            // is what actually restores it.
+            window.styleMask.insert(.fullScreen)
+            window.collectionBehavior.remove(.fullScreenNone)
+            window.collectionBehavior.insert(.fullScreenPrimary)
+        }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -135,6 +150,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         var newFrame = window.frame
         newFrame.size.width = targetWidth
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            window.setFrame(newFrame, display: true)
+            return
+        }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.22
             context.allowsImplicitAnimation = true
@@ -152,6 +171,7 @@ struct TearOffDiaryApp: App {
     let diaryStore = DiaryStore()
     let taskStore = TaskStore()
     let wordStore = WordStore()
+    let themeManager = ThemeManager.shared
 
     var body: some Scene {
         WindowGroup {
@@ -160,6 +180,7 @@ struct TearOffDiaryApp: App {
                 .environment(diaryStore)
                 .environment(taskStore)
                 .environment(wordStore)
+                .environment(themeManager)
                 // No SwiftUI-level maxWidth here — that would be a single
                 // static number, but the ceiling that actually makes sense
                 // is conditional: capped at WindowMetrics.compactMaxWidth
@@ -179,6 +200,7 @@ struct TearOffDiaryApp: App {
                 .environment(diaryStore)
                 .environment(quoteStore)
                 .environment(taskStore)
+                .environment(themeManager)
         }
     }
 }

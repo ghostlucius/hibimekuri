@@ -1,17 +1,31 @@
 import SwiftUI
 
+/// All colors here read live from `ThemeManager.shared` — a plain global
+/// singleton, not a SwiftUI `@Environment` value, so these work identically
+/// whether called from a normal view body or from an isolated render tree
+/// like `AppKitTaskTable`'s manual `ImageRenderer` drag-image snapshot
+/// (which doesn't inherit the surrounding view's environment). Call sites
+/// don't need to change when the active theme changes — as long as they're
+/// evaluated from within a SwiftUI view's `body`, `@Observable`'s access
+/// tracking picks up the read through this indirection just like a direct
+/// property access, so the view still re-renders on theme changes.
 enum DS {
     static let numeralFont = Font.system(size: 180, weight: .black, design: .default)
     static let smallCaption = Font.system(size: 11, weight: .medium, design: .default)
-    static let hairline = Color.primary.opacity(0.18)
-    static let paper = Color(nsColor: .textBackgroundColor)
+
+    private static var palette: ThemePalette { ThemeManager.shared.currentPalette }
+
+    static var paper: Color { palette.background }
+    static var text: Color { palette.textPrimary }
+    static var textSecondary: Color { palette.textSecondary }
+    static var hairline: Color { palette.border }
     // Task rows' own selection highlight — deliberately not using List's
     // native selection binding at all (see TaskListView.swift), since its
     // active-state color is raw NSTableView drawing that neither `.tint()`
     // nor `.listItemTint()` can override on macOS, always showing the
     // user's system accent color regardless. This is a plain background
     // color under our own control instead.
-    static let selection = Color.primary.opacity(0.06)
+    static var selection: Color { palette.accent.opacity(0.12) }
 }
 
 /// Renders a short string as stacked single-character lines, mimicking

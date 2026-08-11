@@ -9,6 +9,7 @@ struct EditablePageView: View {
     var onJumpToToday: (() -> Void)? = nil
 
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Below this width: the compact single-column page (an iPhone-width
     /// "physical desk calendar" card). At or above it: the redesigned
@@ -68,7 +69,7 @@ struct EditablePageView: View {
             // A longer duration than a plain crossfade needs, because a
             // flying/resizing element reads as motion — too fast and it
             // just looks like another snap.
-            .animation(.easeInOut(duration: 0.4), value: isExtended)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.4), value: isExtended)
         }
     }
 
@@ -109,6 +110,7 @@ struct EditablePageView: View {
             .frame(maxWidth: .infinity)
         }
         .background(DS.paper)
+        .foregroundStyle(DS.text)
     }
 
     private func tearButton(_ action: @escaping () -> Void) -> some View {
@@ -122,7 +124,7 @@ struct EditablePageView: View {
             }
             .padding(.vertical, 8)
             .overlay(
-                Rectangle().stroke(Color.primary, lineWidth: 1)
+                Rectangle().stroke(DS.text, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
