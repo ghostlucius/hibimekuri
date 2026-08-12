@@ -39,7 +39,10 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
 
 **The daily page**
 - One page per day — a Japanese idiom or line of literature (with an English meaning
-  underneath), a memo field with light Markdown support, and a persistent task list.
+  underneath), a memo field for the day's writing, and a persistent task list.
+- The memo field supports light Markdown — bold, italic, strikethrough, inline code,
+  and links. You write plain text and it renders as soon as you tab away; no separate
+  formatting toolbar to fight with.
 - Real almanac detail, not decorative filler: kanshi (60-day sexagenary cycle), rokuyō,
   kyūreki (old lunar date, with leap-month detection), jūnichoku, moon phase, and a
   triple-era year header (令和/平成/昭和) — all computed from an actual astronomical
@@ -80,10 +83,16 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
   word-of-the-day for readers who'd rather skip the Japanese entirely.
 
 **Data**
-- 100% local and offline — plain JSON files, no account, no backend, no analytics.
+- Your data is yours, not the app's. Everything is stored as plain, human-readable
+  JSON on your own disk — not a proprietary format or a database locked inside the
+  app — so you can open `entries.json`/`tasks.json` in any text editor whenever you
+  want, with or without Hibimekuri.
+- 100% local and offline — no account, no backend, no analytics. Nothing you write
+  ever leaves your Mac unless you turn on iCloud Drive sync yourself.
 - Optional iCloud Drive sync between your own Macs (not a hosted service — just the
   same files shared via your iCloud Drive).
-- One-click manual export of your data to a folder of your choosing, any time.
+- One-click manual export to a folder of your choosing, any time — an immediate,
+  complete copy of your data, not a request you wait on.
 - Automatic crash-safe saving: debounced writes, a save flush on quit, and automatic
   backup-and-recovery if a data file ever turns out to be unreadable.
 
