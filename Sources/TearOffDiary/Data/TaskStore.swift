@@ -14,6 +14,7 @@ final class TaskStore {
     private var terminateObserver: NSObjectProtocol?
     private var saveTask: Task<Void, Never>?
     private var saveSuspended = false
+    private var isRelocating = false
 
     init() {
         let dir = StorageLocation.activeDirectory
@@ -51,46 +52,56 @@ final class TaskStore {
     }
 
     /// See `DiaryStore.relocateStorage()` — merge and back up rather than
-    /// blindly overwriting whatever already exists at the destination.
+    /// blindly overwriting whatever already exists at the destination. Same
+    /// off-main-actor rationale and `isRelocating` re-entrancy guard apply
+    /// here too.
     func relocateStorage() {
+        guard !isRelocating else { return }
         let newDir = StorageLocation.activeDirectory
         let newURL = newDir.appendingPathComponent("tasks.json")
         guard newURL != fileURL else { return }
 
         let oldURL = fileURL
         saveTask?.cancel()
+        let snapshot = tasks
+        isRelocating = true
 
-        do {
-            let destinationTasks = try JSONFilePersistence.loadArray([TaskItem].self, from: newURL)
-            let preferDestination = (JSONFilePersistence.modificationDate(for: newURL) ?? .distantPast)
-                > (JSONFilePersistence.modificationDate(for: oldURL) ?? .distantPast)
-            let merged = mergedTasks(current: tasks, destination: destinationTasks, preferDestinationConflicts: preferDestination)
-
-            _ = try JSONFilePersistence.backupExistingFile(at: oldURL, reason: "before-move")
-            _ = try JSONFilePersistence.backupExistingFile(at: newURL, reason: "before-merge")
-            try JSONFilePersistence.writeArraySynchronously(merged, to: newURL)
-
-            tasks = merged
-            storageIssueMessage = nil
-            saveSuspended = false
-            TaskNotificationScheduler.rescheduleAll(tasks)
-        } catch {
-            storageIssueMessage = JSONFilePersistence.message(for: error, fileName: "tasks.json", language: currentLanguage)
-            saveSuspended = true
-            return
+        Task {
+            defer { isRelocating = false }
+            do {
+                let merged = try await Self.relocate(current: snapshot, oldURL: oldURL, newURL: newURL)
+                tasks = merged
+                fileURL = newURL
+                storageDirectory = newDir
+                storageIssueMessage = nil
+                saveSuspended = false
+                TaskNotificationScheduler.rescheduleAll(tasks)
+                do {
+                    try FileManager.default.removeItem(at: oldURL)
+                } catch {
+                    storageIssueMessage = Localizer.t(
+                        "古い tasks.json を削除できませんでした。データは新しい保存先にコピー済みです。",
+                        "Couldn't remove the old tasks.json. Your data was copied to the new storage location.",
+                        language: currentLanguage
+                    )
+                }
+            } catch {
+                storageIssueMessage = JSONFilePersistence.message(for: error, fileName: "tasks.json", language: currentLanguage)
+                saveSuspended = true
+            }
         }
+    }
 
-        fileURL = newURL
-        storageDirectory = newDir
-        do {
-            try FileManager.default.removeItem(at: oldURL)
-        } catch {
-            storageIssueMessage = Localizer.t(
-                "古い tasks.json を削除できませんでした。データは新しい保存先にコピー済みです。",
-                "Couldn't remove the old tasks.json. Your data was copied to the new storage location.",
-                language: currentLanguage
-            )
-        }
+    private nonisolated static func relocate(current: [TaskItem], oldURL: URL, newURL: URL) async throws -> [TaskItem] {
+        let destinationTasks = try JSONFilePersistence.loadArray([TaskItem].self, from: newURL)
+        let preferDestination = (JSONFilePersistence.modificationDate(for: newURL) ?? .distantPast)
+            > (JSONFilePersistence.modificationDate(for: oldURL) ?? .distantPast)
+        let merged = mergedTasks(current: current, destination: destinationTasks, preferDestinationConflicts: preferDestination)
+
+        _ = try JSONFilePersistence.backupExistingFile(at: oldURL, reason: "before-move")
+        _ = try JSONFilePersistence.backupExistingFile(at: newURL, reason: "before-merge")
+        try JSONFilePersistence.writeArraySynchronously(merged, to: newURL)
+        return merged
     }
 
     func add(title: String) {
@@ -252,12 +263,15 @@ final class TaskStore {
         return AppLanguage(rawValue: raw) ?? .japanese
     }
 
-    private func mergedTasks(
+    private nonisolated static func mergedTasks(
         current: [TaskItem],
         destination: [TaskItem],
         preferDestinationConflicts: Bool
     ) -> [TaskItem] {
-        var byID = Dictionary(uniqueKeysWithValues: destination.map { ($0.id, $0) })
+        // Not `uniqueKeysWithValues:` — see DiaryStore.mergedEntries for why
+        // a trap here (skipping the do/catch entirely) is worse than an
+        // arbitrary but safe tiebreak on a malformed destination file.
+        var byID = Dictionary(destination.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for task in current {
             if let existing = byID[task.id] {
                 byID[task.id] = preferDestinationConflicts ? existing : task
