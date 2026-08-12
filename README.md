@@ -6,7 +6,7 @@
 <p align="center"><em>日めくり — a tear-off desk calendar, reimagined as a daily journal.</em></p>
 
 <p align="center">
-  <img src="docs/images/screenshot-extended.png" width="820" alt="TearOffDiary, extended two-pane layout">
+  <img src="docs/images/readme-hero.png" width="920" alt="TearOffDiary daily page presentation">
 </p>
 
 ## Philosophy
@@ -92,12 +92,13 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
 ## Screenshots
 
 <p align="center">
-  <img src="docs/images/screenshot-compact.png" width="320" alt="Compact layout">
-  &nbsp;&nbsp;
-  <img src="docs/images/screenshot-settings.png" width="320" alt="Settings — theme picker">
+  <img src="docs/images/readme-daily-page.png" width="820" alt="Daily page with koyomi, literature, and tear-off action">
 </p>
 <p align="center">
-  <img src="docs/images/screenshot-sakura.png" width="820" alt="Sakura theme, extended layout">
+  <img src="docs/images/readme-tasks-data.png" width="820" alt="Task list, settings, and local JSON export">
+</p>
+<p align="center">
+  <img src="docs/images/readme-themes.png" width="820" alt="Six minimal paper themes">
 </p>
 
 ## Install
