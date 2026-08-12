@@ -11,22 +11,25 @@
 
 ## Philosophy
 
-A **himekuri** (日めくり) is the paper tear-off calendar that used to sit on desks and
-walls across Japan: one page per day, torn off each morning to reveal the next. There's
-no scrolling back, no editing yesterday, no dashboard of everything at once — just
-today, and the quiet ritual of closing it out.
+A **himekuri** (日めくり) is the paper tear-off calendar that has sat in Japanese homes,
+shops, and offices for generations: one page per day, torn off each morning to reveal
+the next. It was never a specialist's object — local businesses gave them away as
+everyday gifts, and each page carried small, accessible pieces of seasonal awareness
+and everyday wisdom (a proverb, a lucky-day note) that anyone could read in passing,
+not just people with a particular interest in calendars. The appeal was never the
+information alone; it was the small physical ritual of tearing a page away each
+morning, deliberate in a way a glance at a phone screen isn't.
 
-TearOffDiary borrows that shape for journaling instead of counting down days. Each page
-is a single sitting: the date, a bit of real calendar/almanac detail, a short piece of
-Japanese literature or idiom, a place to write, a small persistent task list — and a
-tear-off action that closes the day and reveals the next one underneath. Torn pages
-aren't deleted; they move to the Archive, exactly like a stack of paper you kept instead
-of throwing away.
+TearOffDiary borrows that shape for journaling instead of counting down days, and it's
+made for anyone who likes that idea — not a niche technical tool. Each page is a single
+sitting: the date, a bit of real calendar/almanac detail connecting the day to the
+wider season, a short piece of Japanese literature or idiom, a place to write, a small
+task list — and a tear-off action that closes the day and reveals the next one
+underneath. Torn pages aren't deleted; they move to the Archive, exactly like a stack
+of paper you kept instead of throwing away.
 
-It's built to be a tool the developer actually wants to open every day, not a feature
-checklist. Minimal chrome, typography-led paper surfaces, a dominant date numeral,
-hairline rules — the app should feel closer to a physical object on a desk than to
-software.
+Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline rules
+— the app is meant to feel closer to a physical object on a desk than to software.
 
 ## Features
 
@@ -47,8 +50,7 @@ software.
   animation for each page passed.
 
 **Tasks**
-- A persistent, Things-inspired to-do list — not scoped to a single day, carries
-  forward on its own.
+- A persistent to-do list, separate from any single day — carries forward on its own.
 - Checklists, per-task notes, drag-to-reorder, and a "do later" defer date that keeps
   tasks off the main list until they're relevant.
 - Deleting a task archives it instead of destroying it — configurable retention (15 /
@@ -82,9 +84,10 @@ software.
   backup-and-recovery if a data file ever turns out to be unreadable.
 
 **Accessibility**
-- VoiceOver labels on every icon-only control, keyboard-operable equivalents for
-  gesture-only interactions, Reduce Motion support throughout, non-color signals for
-  due-date status, and AA-contrast text across every theme.
+- VoiceOver labels on every icon-only control, real buttons (not tap-only gestures) for
+  actions like editing a memo or flipping to the month calendar, Reduce Motion support
+  throughout, non-color signals for due-date status, and AA-contrast text across every
+  theme. Task reordering is drag-based (mouse/trackpad) only for now.
 
 ## Screenshots
 
@@ -134,5 +137,5 @@ notes there) — use the packaged `.app` for anything beyond a quick compile che
 
 ## Status
 
-Early beta. Actively developed, used daily by its own author. Feedback and issues
-welcome once this repo opens up more broadly.
+Early beta, actively developed. Feedback and issues welcome once this repo opens up
+more broadly.
