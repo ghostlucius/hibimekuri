@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/images/app-icon.png" width="128" height="128" alt="TearOffDiary app icon">
+  <img src="docs/images/app-icon.png" width="128" height="128" alt="Hibimekuri app icon">
 </p>
 
-<h1 align="center">TearOffDiary</h1>
-<p align="center"><em>日めくり — a tear-off desk calendar, reimagined as a daily journal.</em></p>
+<h1 align="center">Hibimekuri</h1>
+<p align="center"><em>日々めくり — turn the page, keep the day.</em></p>
 
 <p align="center">
-  <img src="docs/images/readme-hero.png" width="920" alt="TearOffDiary daily page presentation">
+  <img src="docs/images/readme-hero.png" width="920" alt="Hibimekuri daily page presentation">
 </p>
 
 ## Philosophy
@@ -20,7 +20,11 @@ not just people with a particular interest in calendars. The appeal was never th
 information alone; it was the small physical ritual of tearing a page away each
 morning, deliberate in a way a glance at a phone screen isn't.
 
-TearOffDiary borrows that shape for journaling instead of counting down days, and it's
+**Hibimekuri** (日々めくり) adds the Japanese repetition mark **々** to that idea:
+**日** becomes **日々**, from one day to everyday life. The name suggests turning
+through the days one page at a time — a himekuri for the days you keep.
+
+Hibimekuri borrows that shape for journaling instead of counting down days, and it's
 made for anyone who likes that idea — not a niche technical tool. Each page is a single
 sitting: the date, a bit of real calendar/almanac detail connecting the day to the
 wider season, a short piece of Japanese literature or idiom, a place to write, a small
@@ -103,8 +107,8 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
 
 ## Install
 
-Grab the latest `.dmg` from [Releases](../../releases), open it, and drag TearOffDiary
-into Applications.
+Grab the latest `.dmg` from [Releases](../../releases), open it, and drag the app into
+Applications.
 
 **About that Gatekeeper warning:** this build is ad-hoc signed, not signed with a paid
 Apple Developer ID (that costs $99/year, and this isn't going through the App Store).
@@ -112,7 +116,7 @@ macOS will say it "cannot verify" the app or is "from an unidentified developer"
 first time you open it. That's expected, not a sign anything is wrong — right-click the
 app → **Open**, confirm once, and it'll launch normally every time after. Alternatively,
 after a blocked launch attempt, go to **System Settings → Privacy & Security** and
-click **Open Anyway** next to the TearOffDiary warning.
+click **Open Anyway** next to the app warning.
 
 Requires macOS 14 or later. Universal binary — runs natively on both Apple Silicon and
 Intel Macs.
@@ -122,8 +126,8 @@ Intel Macs.
 No Xcode project — this is a plain Swift Package Manager executable.
 
 ```bash
-git clone https://github.com/ghostlucius/himekuri.git
-cd himekuri
+git clone https://github.com/ghostlucius/hibimekuri.git
+cd hibimekuri
 swift build
 ```
 

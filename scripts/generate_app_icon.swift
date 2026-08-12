@@ -5,16 +5,16 @@ import AppKit
 // macOS's .iconset format needs, then packs each into a .icns via iconutil.
 // No Xcode/Icon Composer available in this environment, so this draws the
 // icon directly with AppKit/CoreGraphics instead — a rounded-square paper
-// tile, a bold glyph, and a small folded (dog-ear) corner to read as a torn
+// tile, a compact brand glyph, and a small folded (dog-ear) corner to read as a torn
 // calendar page. Run once at build/design time, not part of the app itself;
 // output lands in AppIcon/AppIcon.icns and AppIcon/AppIconDark.icns.
 //
 // This is the *static* icon only — Finder/Launchpad/before-first-launch,
 // where nothing is running to draw a live date. The actual running app
 // overwrites its Dock tile with today's real day number instead (see
-// AppIconManager.swift), so this one shows 暦 ("koyomi" — calendar/almanac,
-// already this app's own name for its date-math engine) rather than a
-// numeral that would just look stale sitting in Launchpad.
+// AppIconManager.swift), so this one shows 日々 ("hibi" — days/everyday
+// life), the compact mark for Hibimekuri / 日々めくり, rather than a numeral
+// that would just look stale sitting in Launchpad.
 
 struct Theme {
     let name: String
@@ -70,11 +70,10 @@ func drawIcon(size: CGFloat, theme: Theme) -> NSImage {
     theme.background.setFill()
     base.fill()
 
-    // Big bold glyph, centered within the content area. Slightly smaller
-    // ratio than a numeral would use — 暦 is a dense, multi-stroke
-    // character, and at the numeral's 0.52 ratio it read as too heavy/
-    // cramped against the tile edges.
-    let glyphFont = NSFont.systemFont(ofSize: contentSize * 0.46, weight: .black)
+    // Big bold glyph, centered within the content area. Two compact kanji
+    // read better slightly smaller than a one-character mark, especially at
+    // tiny Finder sizes.
+    let glyphFont = NSFont.systemFont(ofSize: contentSize * 0.34, weight: .black)
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .center
     let attrs: [NSAttributedString.Key: Any] = [
@@ -82,7 +81,7 @@ func drawIcon(size: CGFloat, theme: Theme) -> NSImage {
         .foregroundColor: theme.numeral,
         .paragraphStyle: paragraph,
     ]
-    let numeral = NSAttributedString(string: "暦", attributes: attrs)
+    let numeral = NSAttributedString(string: "日々", attributes: attrs)
     let textSize = numeral.size()
     let textRect = NSRect(
         x: inset + (contentSize - textSize.width) / 2,

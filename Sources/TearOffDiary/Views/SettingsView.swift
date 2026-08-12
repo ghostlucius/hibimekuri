@@ -191,7 +191,7 @@ struct SettingsView: View {
                 HairlineDivider()
 
                 section(Localizer.t("このアプリについて", "ABOUT", language: language)) {
-                    Button(Localizer.t("日めくりについて", "About Himekuri", language: language)) {
+                    Button(Localizer.t("日々めくりについて", "About Hibimekuri", language: language)) {
                         showOnboarding = true
                     }
                     .font(.system(size: 12))
@@ -389,6 +389,10 @@ struct SettingsView: View {
 
             Task.detached {
                 do {
+                    try Self.validateExportDestination(
+                        destination,
+                        sourceDirectories: [entriesDirectory, tasksDirectory]
+                    )
                     try Self.copyStoreFile(named: "entries.json", from: entriesDirectory, to: destination)
                     try Self.copyStoreFile(named: "tasks.json", from: tasksDirectory, to: destination)
                     await MainActor.run {
@@ -398,7 +402,7 @@ struct SettingsView: View {
                     }
                 } catch {
                     await MainActor.run {
-                        let message = Localizer.t("書き出しに失敗しました。", "Export failed.", language: currentLanguage)
+                        let message = Self.exportMessage(for: error, language: currentLanguage)
                         exportMessage = message
                         announceExportMessage(message)
                     }
@@ -415,17 +419,48 @@ struct SettingsView: View {
         )
     }
 
+    private enum ExportError: Error {
+        case destinationIsStorageDirectory
+    }
+
+    nonisolated private static func validateExportDestination(_ destination: URL, sourceDirectories: [URL]) throws {
+        let resolvedDestination = destination.standardizedFileURL.resolvingSymlinksInPath()
+        let resolvesToStorage = sourceDirectories.contains {
+            $0.standardizedFileURL.resolvingSymlinksInPath() == resolvedDestination
+        }
+        if resolvesToStorage {
+            throw ExportError.destinationIsStorageDirectory
+        }
+    }
+
     nonisolated private static func copyStoreFile(named fileName: String, from sourceDirectory: URL, to destinationDirectory: URL) throws {
         let source = sourceDirectory.appendingPathComponent(fileName)
         let destination = destinationDirectory.appendingPathComponent(fileName)
         let manager = FileManager.default
-        if manager.fileExists(atPath: destination.path) {
-            try manager.removeItem(at: destination)
-        }
+        let replacement = destinationDirectory.appendingPathComponent(".\(fileName).exporting-\(UUID().uuidString)")
+        defer { try? manager.removeItem(at: replacement) }
+
         if manager.fileExists(atPath: source.path) {
-            try manager.copyItem(at: source, to: destination)
+            try manager.copyItem(at: source, to: replacement)
         } else {
-            try Data("[]".utf8).write(to: destination, options: .atomic)
+            try Data("[]".utf8).write(to: replacement, options: .atomic)
         }
+
+        if manager.fileExists(atPath: destination.path) {
+            _ = try manager.replaceItemAt(destination, withItemAt: replacement, backupItemName: nil, options: [])
+        } else {
+            try manager.moveItem(at: replacement, to: destination)
+        }
+    }
+
+    private static func exportMessage(for error: Error, language: AppLanguage) -> String {
+        if case ExportError.destinationIsStorageDirectory = error {
+            return Localizer.t(
+                "保存先フォルダには書き出せません。別のフォルダを選んでください。",
+                "Choose a folder other than Hibimekuri's data folder for export.",
+                language: language
+            )
+        }
+        return Localizer.t("書き出しに失敗しました。", "Export failed.", language: language)
     }
 }

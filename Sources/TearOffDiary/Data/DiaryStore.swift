@@ -138,6 +138,7 @@ final class DiaryStore {
         } catch {
             do {
                 _ = try JSONFilePersistence.backupExistingFile(at: fileURL, reason: "unreadable")
+                try FileManager.default.removeItem(at: fileURL)
                 entries = []
                 storageIssueMessage = Localizer.t(
                     "entries.json を読み込めませんでした。元ファイルをバックアップし、新しい記録として開始しました。",

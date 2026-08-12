@@ -214,6 +214,7 @@ final class TaskStore {
         } catch {
             do {
                 _ = try JSONFilePersistence.backupExistingFile(at: fileURL, reason: "unreadable")
+                try FileManager.default.removeItem(at: fileURL)
                 tasks = []
                 storageIssueMessage = Localizer.t(
                     "tasks.json を読み込めませんでした。元ファイルをバックアップし、新しいタスクリストとして開始しました。",

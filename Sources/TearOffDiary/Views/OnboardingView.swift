@@ -8,9 +8,9 @@ struct OnboardingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(Localizer.t("日めくり", "Himekuri", language: language))
+                Text(Localizer.t("日々めくり", "Hibimekuri", language: language))
                     .font(.system(size: 28, weight: .black))
-                Text(Localizer.t("一日一枚の、小さな区切り。", "One page, one day, one small pause.", language: language))
+                Text(Localizer.t("日々をめくり、今日を残す。", "Turn the page. Keep the day.", language: language))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(DS.textSecondary)
             }
@@ -21,6 +21,10 @@ struct OnboardingView: View {
                 Text(Localizer.t(
                     "日めくりカレンダーは、毎朝一枚をめくり、その日だけを机の上に残す道具です。",
                     "A himekuri calendar is a daily tear-off calendar: each morning leaves only today on the desk.",
+                    language: language))
+                Text(Localizer.t(
+                    "日々めくりは、日めくりに「々」を加えた名前です。一日が日々になり、毎日の記録として積み重なっていきます。",
+                    "Hibimekuri adds the Japanese repetition mark to himekuri: one day becomes days, gathered as a record of everyday life.",
                     language: language))
                 Text(Localizer.t(
                     "このアプリでは、切り取ることは「今日を終える」合図です。書いたことはアーカイブに残り、次の日が静かに現れます。",

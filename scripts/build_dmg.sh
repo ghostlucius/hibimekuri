@@ -14,12 +14,21 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-APP_NAME="TearOffDiary"
+APP_NAME="Hibimekuri"
+EXECUTABLE_NAME="TearOffDiary"
 BUNDLE_ID="com.himekuri.tearoffdiary"
 VERSION="1.0.0"
 DIST_DIR="dist"
-STAGING_ROOT="/tmp/himekuri_build_staging"
+STAGING_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/hibimekuri_build.XXXXXX")"
 APP_DIR="$STAGING_ROOT/$APP_NAME.app"
+
+# Keep the signed app for local testing on success, but remove this private
+# staging directory if packaging stops midway. mktemp creates an owner-only,
+# unique directory so another local process cannot pre-populate it.
+cleanup_staging_on_failure() {
+    rm -rf "$STAGING_ROOT"
+}
+trap cleanup_staging_on_failure ERR INT TERM
 SIGN_IDENTITY="${HIMEKURI_SIGN_IDENTITY:--}"
 
 echo "==> Building release binary (arm64 + x86_64, merged into a universal binary)"
@@ -34,15 +43,14 @@ swift build -c release --arch arm64
 swift build -c release --arch x86_64
 
 echo "==> Assembling $APP_NAME.app (staged outside iCloud Drive at $STAGING_ROOT)"
-rm -rf "$STAGING_ROOT"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
-lipo -create -output "$APP_DIR/Contents/MacOS/$APP_NAME" \
-    ".build/arm64-apple-macosx/release/$APP_NAME" \
-    ".build/x86_64-apple-macosx/release/$APP_NAME"
-lipo "$APP_DIR/Contents/MacOS/$APP_NAME" -verify_arch arm64 x86_64
+lipo -create -output "$APP_DIR/Contents/MacOS/$EXECUTABLE_NAME" \
+    ".build/arm64-apple-macosx/release/$EXECUTABLE_NAME" \
+    ".build/x86_64-apple-macosx/release/$EXECUTABLE_NAME"
+lipo "$APP_DIR/Contents/MacOS/$EXECUTABLE_NAME" -verify_arch arm64 x86_64
 
-RESOURCE_BUNDLE=".build/arm64-apple-macosx/release/${APP_NAME}_${APP_NAME}.bundle"
+RESOURCE_BUNDLE=".build/arm64-apple-macosx/release/${EXECUTABLE_NAME}_${EXECUTABLE_NAME}.bundle"
 if [ -d "$RESOURCE_BUNDLE" ]; then
     cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
 fi
@@ -74,7 +82,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>CFBundleShortVersionString</key>
     <string>$VERSION</string>
     <key>CFBundleExecutable</key>
-    <string>$APP_NAME</string>
+    <string>$EXECUTABLE_NAME</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
