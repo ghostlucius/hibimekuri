@@ -83,14 +83,8 @@ struct MiniMonthGrid: View {
                             )
                             .overlay {
                                 if isDueDate {
-                                    ZStack {
-                                        Circle()
-                                            .stroke(Color.red, lineWidth: ringLineWidth)
-                                        Circle()
-                                            .fill(Color.red)
-                                            .frame(width: large ? 3.6 : 2.6, height: large ? 3.6 : 2.6)
-                                            .offset(y: cellMinHeight * 0.32)
-                                    }
+                                    Circle()
+                                        .stroke(Color.red, lineWidth: ringLineWidth)
                                 }
                             }
                             .accessibilityLabel(accessibilityLabel(for: d, isHighlighted: isHighlighted, isMarked: isDueDate))

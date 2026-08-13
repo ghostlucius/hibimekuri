@@ -167,9 +167,9 @@ struct DayPageHeader: View {
             AlmanacField(label: Localizer.fieldLabel("六曜", language: language), value: Localizer.rokuyo(koyomi.rokuyo, language: language))
             AlmanacField(label: Localizer.fieldLabel("旧暦", language: language), value: Localizer.kyureki(month: koyomi.kyureki.month, day: koyomi.kyureki.day, isLeap: koyomi.kyureki.isLeap, language: language))
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Image(systemName: koyomi.moonPhaseSymbol)
-                    .font(.system(size: 11))
+                    .font(.system(size: 15))
                     .foregroundStyle(.secondary)
                 Text(Localizer.moonPhase(koyomi.moonPhaseName, language: language))
                     .font(.system(size: 8))

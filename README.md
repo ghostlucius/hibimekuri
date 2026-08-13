@@ -43,6 +43,9 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
 - The memo field supports light Markdown — bold, italic, strikethrough, inline code,
   and links. You write plain text and it renders as soon as you tab away; no separate
   formatting toolbar to fight with.
+- Three quote sources to pick from in Settings: the Japanese idiom, an English word of
+  the day, or your own imported quotes — a plain JSON file you provide yourself (see
+  [docs/sample-custom-quotes.json](docs/sample-custom-quotes.json) for the format).
 - Real almanac detail, not decorative filler: kanshi (60-day sexagenary cycle), rokuyō,
   kyūreki (old lunar date, with leap-month detection), jūnichoku, moon phase, and a
   triple-era year header (令和/平成/昭和) — all computed from an actual astronomical
@@ -148,6 +151,13 @@ To produce a distributable `.app`/`.dmg` (universal binary, ad-hoc signed):
 
 `swift run` is not representative of a real launch (see `scripts/build_dmg.sh` and the
 notes there) — use the packaged `.app` for anything beyond a quick compile check.
+
+## Documentation
+
+See the [User Guide](docs/USER_GUIDE.md) for a walkthrough of every feature — the
+daily page, the almanac fields, tasks, Custom Quote, themes, and how your data is
+stored. It's also linked from the app itself: Hibimekuri menu → About Hibimekuri →
+Help.
 
 ## Status
 
