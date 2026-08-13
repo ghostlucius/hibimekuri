@@ -1,10 +1,12 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(DiaryStore.self) private var store
     @Environment(QuoteStore.self) private var quoteStore
     @Environment(TaskStore.self) private var taskStore
+    @Environment(CustomQuoteStore.self) private var customQuoteStore
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
@@ -14,7 +16,6 @@ struct SettingsView: View {
     @AppStorage("taskRetentionDays") private var taskRetention: TaskRetention = .thirtyDays
     @State private var showArchivedTasks = false
     @State private var exportMessage: String?
-    @State private var showOnboarding = false
 
     private var storageURL: URL {
         store.storageDirectory.appendingPathComponent("entries.json")
@@ -22,6 +23,13 @@ struct SettingsView: View {
 
     private var iCloudDriveAvailable: Bool {
         StorageLocation.iCloudDirectory != nil
+    }
+
+    /// Word of the day is English-only by design (see `QuoteStyle`'s own
+    /// doc comment) — hidden from the picker in Japanese mode rather than
+    /// shown as a dead end.
+    private var visibleQuoteStyles: [QuoteStyle] {
+        QuoteStyle.allCases.filter { $0 != .englishWord || language == .english }
     }
 
     /// Most recently deleted first — that's the one someone's most likely
@@ -66,18 +74,24 @@ struct SettingsView: View {
                     }
                 }
 
-                if language == .english {
-                    HairlineDivider()
+                HairlineDivider()
 
-                    section("DAILY QUOTE") {
-                        HStack(spacing: 8) {
-                            ForEach(QuoteStyle.allCases) { option in
-                                quoteStyleButton(option)
-                            }
+                section(Localizer.t("引用", "DAILY QUOTE", language: language)) {
+                    HStack(spacing: 8) {
+                        ForEach(visibleQuoteStyles) { option in
+                            quoteStyleButton(option)
                         }
-                        Text("Word of the day replaces the Japanese idiom entirely, for readers who'd rather stay in English.")
+                    }
+                    if quoteStyle == .englishWord {
+                        Text(Localizer.t(
+                            "英語の「今日の単語」が、日本語の引用の代わりに表示されます。",
+                            "Word of the day replaces the Japanese idiom entirely, for readers who'd rather stay in English.",
+                            language: language))
                             .font(.system(size: 11))
                             .foregroundStyle(.tertiary)
+                    }
+                    if quoteStyle == .custom {
+                        customQuoteImportControls
                     }
                 }
 
@@ -140,6 +154,7 @@ struct SettingsView: View {
                     .onChange(of: iCloudSyncEnabled) { _, _ in
                         store.relocateStorage()
                         taskStore.relocateStorage()
+                        customQuoteStore.relocateStorage()
                     }
 
                     if iCloudSyncEnabled && !iCloudDriveAvailable {
@@ -190,11 +205,13 @@ struct SettingsView: View {
 
                 HairlineDivider()
 
-                section(Localizer.t("このアプリについて", "ABOUT", language: language)) {
-                    Button(Localizer.t("日々めくりについて", "About Hibimekuri", language: language)) {
-                        showOnboarding = true
-                    }
-                    .font(.system(size: 12))
+                // Was "ABOUT", holding both a philosophy link and these
+                // counts. The real About panel now lives where every Mac
+                // app puts it (Hibimekuri menu → About Hibimekuri, see
+                // AboutView) — including the himekuri-philosophy screen
+                // that used to open from here — so what's left in Settings
+                // is purely numbers about your own data.
+                section(Localizer.t("統計", "STATISTICS", language: language)) {
                     Text(Localizer.t("\(store.entries.count) 件の記録", "\(store.entries.count) entries recorded", language: language))
                         .font(.system(size: 12))
                     Text(Localizer.t("\(taskStore.tasks.count) 件のタスク", "\(taskStore.tasks.count) tasks tracked", language: language))
@@ -216,11 +233,6 @@ struct SettingsView: View {
         .background(DS.paper)
         .foregroundStyle(DS.text)
         .frame(width: 440, height: 460)
-        .sheet(isPresented: $showOnboarding) {
-            OnboardingView {
-                showOnboarding = false
-            }
-        }
     }
 
     private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
@@ -357,7 +369,7 @@ struct SettingsView: View {
         Button {
             quoteStyle = option
         } label: {
-            Text(option.displayName)
+            Text(option.displayName(language: language))
                 .font(.system(size: 12, weight: .semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -371,6 +383,90 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(quoteStyle == option ? .isSelected : [])
+    }
+
+    private var customQuoteImportControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(Localizer.t(
+                "\(customQuoteStore.quotes.count) 件のカスタム引用",
+                "\(customQuoteStore.quotes.count) custom quotes loaded",
+                language: language))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Button(Localizer.t("引用をインポート…", "Import Quotes…", language: language)) {
+                    importCustomQuotes()
+                }
+                .font(.system(size: 12))
+
+                // Most people will never look at the GitHub repo's
+                // docs/sample-custom-quotes.json — this generates the same
+                // shape directly from CustomQuoteEntry via JSONEncoder, so
+                // it's guaranteed to match what importCustomQuotes() above
+                // can actually parse rather than risking a bundled sample
+                // file drifting out of sync with the real format.
+                Button(Localizer.t("サンプルをダウンロード…", "Download Sample…", language: language)) {
+                    downloadSampleQuotes()
+                }
+                .font(.system(size: 12))
+            }
+
+            if let issue = customQuoteStore.storageIssueMessage {
+                storageIssue(issue)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    /// A JSON array of `{ "text": "...", "attribution": "..." }` (attribution
+    /// optional) — see requirements.md, "Custom Quote", for the full format
+    /// and rotation rules. Copied into the app's own data directory on
+    /// import, not read live from wherever the user picked it.
+    private func importCustomQuotes() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.json]
+        panel.prompt = Localizer.t("インポート", "Import", language: language)
+
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            let currentLanguage = language
+            Task {
+                await customQuoteStore.importFile(from: url, language: currentLanguage)
+            }
+        }
+    }
+
+    private func downloadSampleQuotes() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "sample-custom-quotes.json"
+        panel.allowedContentTypes = [.json]
+        panel.prompt = Localizer.t("保存", "Save", language: language)
+
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            Task.detached {
+                try? Self.sampleQuotesData()?.write(to: url, options: .atomic)
+            }
+        }
+    }
+
+    /// Same three example quotes as docs/sample-custom-quotes.json, kept in
+    /// sync by hand (small, unlikely to drift) — see that file's comment.
+    /// `nonisolated` (not a stored property on the view) so it's safe to
+    /// call from the `Task.detached` above.
+    nonisolated private static func sampleQuotesData() -> Data? {
+        let sample: [CustomQuoteEntry] = [
+            CustomQuoteEntry(text: "The unexamined life is not worth living.", attribution: "Socrates"),
+            CustomQuoteEntry(text: "Simplicity is the ultimate sophistication.", attribution: "Leonardo da Vinci"),
+            CustomQuoteEntry(text: "A quote with no attribution is fine too — it's optional.", attribution: nil),
+        ]
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try? encoder.encode(sample)
     }
 
     private func exportData() {

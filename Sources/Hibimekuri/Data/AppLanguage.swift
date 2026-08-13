@@ -39,16 +39,23 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
-/// Only meaningful in English mode: whether the daily quote card shows the
-/// Japanese idiom (with its English meaning) or an English word of the day.
+/// Which source the daily quote card reads from. `.englishWord` is only
+/// ever offered in English mode (see `SettingsView`'s DAILY QUOTE picker) —
+/// it's an alternative for readers who'd rather not have Japanese content
+/// at all. `.japaneseIdiom` and `.custom` are available in both languages.
 enum QuoteStyle: String, CaseIterable, Identifiable {
     case japaneseIdiom
     case englishWord
+    case custom
 
     var id: String { rawValue }
 
-    var displayName: String {
-        self == .japaneseIdiom ? "Japanese idiom" : "Word of the day"
+    func displayName(language: AppLanguage) -> String {
+        switch self {
+        case .japaneseIdiom: return Localizer.t("日本語の引用", "Japanese idiom", language: language)
+        case .englishWord: return Localizer.t("今日の単語", "Word of the day", language: language)
+        case .custom: return Localizer.t("カスタム", "Custom", language: language)
+        }
     }
 }
 
