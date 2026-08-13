@@ -89,10 +89,27 @@ struct AppKitTaskTable<Item: Identifiable, RowContent: View>: NSViewRepresentabl
         // animation and the commit through this one array removes that
         // whole bug class instead of patching around it.
         private var workingItems: [Item]
+        // Snapshot of `workingItems` taken once, at the moment the drag
+        // starts (`willBeginAt`) — before any live reflow has touched it.
+        // `validateDrop` computes every proposed position from this fixed
+        // frame, never from `workingItems` itself. Computing `fromIndex`
+        // from `workingItems` (the previous approach) meant it kept
+        // shifting as the drag reflowed rows: reversing direction
+        // mid-drag recomputed `fromIndex` against an array the drag had
+        // already mutated, and the `toIndex -= 1` adjustment below
+        // compounded against that moving target — confirmed via manual
+        // testing to silently land back on the same index instead of
+        // actually moving back, i.e. dragging past a row and then
+        // reversing direction got stuck instead of undoing the reflow.
+        // Row *count* never changes during a pure reorder, so a row's
+        // on-screen slot index stays meaningful against this fixed
+        // snapshot throughout the whole gesture.
+        private var dragOriginItems: [Item]
 
         init(_ parent: AppKitTaskTable) {
             self.parent = parent
             self.workingItems = parent.items
+            self.dragOriginItems = parent.items
         }
 
         /// Re-syncs from the SwiftUI-owned `items` whenever they change for
@@ -170,6 +187,7 @@ struct AppKitTaskTable<Item: Identifiable, RowContent: View>: NSViewRepresentabl
             guard let index = rowIndexes.first, workingItems.indices.contains(index) else { return }
             let item = workingItems[index]
             draggedItemID = item.id
+            dragOriginItems = workingItems
 
             // `ImageRenderer` builds an isolated render tree that doesn't
             // inherit `NSApp.appearance` — the app's actual dark-mode
@@ -216,7 +234,7 @@ struct AppKitTaskTable<Item: Identifiable, RowContent: View>: NSViewRepresentabl
         // insertion-style drop before evaluating it.
         func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int, proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
             guard let draggedItemID,
-                  let fromIndex = workingItems.firstIndex(where: { $0.id == draggedItemID }) else {
+                  let fromIndex = dragOriginItems.firstIndex(where: { $0.id == draggedItemID }) else {
                 return []
             }
             if dropOperation != .above {
@@ -226,10 +244,18 @@ struct AppKitTaskTable<Item: Identifiable, RowContent: View>: NSViewRepresentabl
             if toIndex > fromIndex {
                 toIndex -= 1
             }
-            toIndex = max(0, min(toIndex, workingItems.count - 1))
-            if toIndex != fromIndex {
-                let item = workingItems.remove(at: fromIndex)
-                workingItems.insert(item, at: toIndex)
+            toIndex = max(0, min(toIndex, dragOriginItems.count - 1))
+
+            // Always recomputed fresh from the fixed pre-drag snapshot, not
+            // by mutating `workingItems` incrementally — see
+            // `dragOriginItems`'s doc comment for why that broke reversing
+            // direction mid-drag.
+            var proposed = dragOriginItems
+            let item = proposed.remove(at: fromIndex)
+            proposed.insert(item, at: toIndex)
+
+            if proposed.map(\.id) != workingItems.map(\.id) {
+                workingItems = proposed
                 // `moveRow` cross-fades between the old and new position —
                 // even with zero-duration animation wrapping, it still
                 // briefly rendered the row at both places at once, and a

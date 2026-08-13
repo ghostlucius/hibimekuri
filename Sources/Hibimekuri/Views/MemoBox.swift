@@ -79,7 +79,21 @@ struct MemoBox: View {
                             isFocused = editing
                         }
                         .onChange(of: isFocused) { _, focused in
-                            if !focused { isEditing = false }
+                            // Mirrors both ways, not just focus-lost→false.
+                            // An empty memo shows this editor immediately
+                            // (showEditor is true from `text.isEmpty` alone,
+                            // isEditing never gets set) — clicking directly
+                            // into it focuses it at the AppKit level without
+                            // ever setting isEditing, so the instant the
+                            // first keystroke makes text non-empty,
+                            // `text.isEmpty` stops being true and nothing
+                            // else was holding showEditor open, collapsing
+                            // the editor back to the preview mid-keystroke
+                            // and dropping focus. Setting isEditing here too
+                            // keeps showEditor true for the rest of the
+                            // session once real focus lands, regardless of
+                            // which path (button tap or direct click) got it there.
+                            isEditing = focused
                         }
                 } else {
                     Button {
