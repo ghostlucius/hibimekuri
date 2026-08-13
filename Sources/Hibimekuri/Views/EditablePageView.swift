@@ -29,47 +29,112 @@ struct EditablePageView: View {
     /// grows, nothing inside it moves.
     private let compactDesignWidth = WindowMetrics.compactMaxWidth
 
-    /// Shared between this view's compact and extended branches so
-    /// `.matchedGeometryEffect` can recognize the task list, note box, and
-    /// tear button as the *same* elements across the swap and animate
-    /// their frame (position + size) from the compact position to the
-    /// extended one, instead of just crossfading two unrelated view
-    /// trees. This is the literal "tasks/notes swing to the right" the
-    /// two-pane layout was designed around from the start but never
-    /// actually animated until now.
-    @Namespace private var transitionNamespace
+    // Was `@Namespace` + `.matchedGeometryEffect` on the task list, note
+    // box, and tear button, so they'd visually fly/resize from their
+    // compact position to their extended one instead of crossfading — a
+    // literal geometry morph. Removed in favor of a plain opacity crossfade
+    // — confirmed directly, more than once, that a crossfade (not a morph)
+    // is what was actually wanted.
+    //
+    // That crossfade was originally implemented as `if isExtended {
+    // ExtendedPageView() } else { compactBody }` inside a `Group`, with
+    // `.transition(.opacity)` on each branch — the standard SwiftUI recipe
+    // for animating a conditional swap. In practice this did not read as a
+    // fade: content appeared/disappeared abruptly instead. Two compounding
+    // problems, not one:
+    //
+    // 1. `.transition()` only animates reliably when the state change that
+    //    triggers the insertion/removal happens inside an animation
+    //    transaction. `.animation(_:value:)` is supposed to provide that
+    //    for the whole subtree, but for a *structural* if/else swap (not
+    //    just a property change) it's the less robust of the two supported
+    //    patterns — `withAnimation` around the actual mutation is the
+    //    reliable one, so every place that sets `isExtended` below wraps it
+    //    explicitly instead of leaning on an ambient `.animation()` modifier.
+    // 2. Each branch was a *fresh* view every time it appeared — a new
+    //    `ExtendedPageView`, a new `DiaryIllustrationView` inside it, reset
+    //    `@State`, from zero. Even with the transition firing correctly,
+    //    the illustration specifically still had nothing to show for the
+    //    first several frames while its image loaded, i.e. still popped in
+    //    rather than fading in the exact motion it should have.
+    //
+    // Fixed by not mounting/unmounting either side at all: both
+    // `compactBody` and `ExtendedPageView` are always present, stacked, and
+    // cross-faded via plain `.opacity()` — an ordinary property animation,
+    // not a transition on a structural change, which is the more reliable
+    // of the two in SwiftUI. This is also exactly what keeps the
+    // illustration persistent instead of reloading: `ExtendedPageView`
+    // (and the `DiaryIllustrationView` inside it) is created once, the
+    // moment this page itself appears, regardless of which mode the window
+    // starts in — so its image has the entire time before a user ever
+    // drags the window wide to finish loading in the background, matching
+    // `IllustrationLoader`'s launch-time warm-up.
+    @State private var isExtended = false
+
+    private var transitionAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.65)
+    }
 
     var body: some View {
         GeometryReader { geo in
-            let isExtended = geo.size.width >= extendedThreshold
-            Group {
-                if isExtended {
-                    ExtendedPageView(
-                        entry: $entry,
-                        quote: quote,
-                        onTearOff: onTearOff,
-                        onPrevDay: onPrevDay,
-                        onNextDay: onNextDay,
-                        onJumpToToday: onJumpToToday,
-                        transitionNamespace: transitionNamespace
-                    )
-                    .transition(.opacity)
-                } else {
-                    compactBody
-                        .transition(.opacity)
+            ZStack {
+                // ZStack sizes itself to its *largest* child by default —
+                // both children are always present now (that's the whole
+                // point, see above), and ExtendedPageView's fixed 400pt
+                // left pane plus flexible right pane wants far more than
+                // 390pt. Without pinning each child to the real current
+                // size explicitly, that demand leaked into the container
+                // even while ExtendedPageView sat at opacity 0: the
+                // compact page's own right-aligned content (month name,
+                // mini calendars, the jūnichoku column) got laid out
+                // against that wider phantom width and ran off the actual
+                // window's right edge — confirmed via screenshot, not a
+                // theoretical worry. Each child gets the outer
+                // GeometryReader's actual size directly, so neither one's
+                // natural width can influence the other or the container.
+                compactBody
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .opacity(isExtended ? 0 : 1)
+                    .allowsHitTesting(!isExtended)
+                ExtendedPageView(
+                    entry: $entry,
+                    quote: quote,
+                    onTearOff: onTearOff,
+                    onPrevDay: onPrevDay,
+                    onNextDay: onNextDay,
+                    onJumpToToday: onJumpToToday
+                )
+                .frame(width: geo.size.width, height: geo.size.height)
+                .opacity(isExtended ? 1 : 0)
+                .allowsHitTesting(isExtended)
+            }
+            // The default, organic path: a live drag that crosses the
+            // threshold directly (past the dead zone AppDelegate snaps,
+            // not into it) updates isExtended the moment the width
+            // actually crosses. initial:true seeds the correct mode on
+            // first layout without needing a resize first — not animated,
+            // since this is the page's very first layout pass, not a
+            // transition the user should see.
+            .onChange(of: geo.size.width, initial: true) { _, width in
+                let extended = width >= extendedThreshold
+                guard extended != isExtended else { return }
+                withAnimation(transitionAnimation) {
+                    isExtended = extended
                 }
             }
-            // The header/numeral/almanac/calendar block isn't matched —
-            // it's already nearly identical in both modes (same fixed-ish
-            // width, same component, same position at the top of a
-            // column), so it just fades in place. Tasks and the note box
-            // are the two elements that genuinely relocate (single column
-            // → dedicated right pane), so those are the ones tagged with
-            // `.matchedGeometryEffect` below and in `ExtendedPageView`.
-            // A longer duration than a plain crossfade needs, because a
-            // flying/resizing element reads as motion — too fast and it
-            // just looks like another snap.
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.4), value: isExtended)
+        }
+        // The dead-zone snap path: AppDelegate posts this the instant it
+        // decides which side to animate the window toward, before that
+        // animation starts — so this flip (and the crossfade it triggers)
+        // begins at the same moment the window starts resizing, not once
+        // GeometryReader's width finally reaches the target. See
+        // .layoutModeWillSnap's doc comment for the full reasoning; this is
+        // what actually removes the pause.
+        .onReceive(NotificationCenter.default.publisher(for: .layoutModeWillSnap)) { note in
+            guard let extended = note.userInfo?["isExtended"] as? Bool, extended != isExtended else { return }
+            withAnimation(transitionAnimation) {
+                isExtended = extended
+            }
         }
     }
 
@@ -81,13 +146,10 @@ struct EditablePageView: View {
                 DailyQuoteView(date: entry.date, quote: quote)
                 HairlineDivider()
                 TaskListView()
-                    .matchedGeometryEffect(id: "tasks", in: transitionNamespace)
                 MemoBox(text: $entry.journalText)
-                    .matchedGeometryEffect(id: "note", in: transitionNamespace)
                 Spacer(minLength: 2)
                 if let onTearOff {
                     tearButton(onTearOff)
-                        .matchedGeometryEffect(id: "tearButton", in: transitionNamespace)
                 }
             }
             .padding(.horizontal, 18)
@@ -123,6 +185,10 @@ struct EditablePageView: View {
                 Spacer()
             }
             .padding(.vertical, 8)
+            // See OnboardingView's identical fix: Spacers paint nothing, so
+            // without this only the Text label was actually clickable, not
+            // the full button width.
+            .contentShape(Rectangle())
             .overlay(
                 Rectangle().stroke(DS.text, lineWidth: 1)
             )

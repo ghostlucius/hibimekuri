@@ -48,6 +48,13 @@ struct OnboardingView: View {
                     Spacer()
                 }
                 .padding(.vertical, 9)
+                // Without this, only the Text itself is hit-testable — the
+                // Spacers on either side paint nothing, so SwiftUI's default
+                // hit-testing (tightest bounds of actual painted content)
+                // excludes them even though they visually fill the rest of
+                // the button. This makes the whole rectangle clickable, not
+                // just the label text in the middle.
+                .contentShape(Rectangle())
                 .overlay(Rectangle().stroke(DS.text, lineWidth: 1))
             }
             .buttonStyle(.plain)

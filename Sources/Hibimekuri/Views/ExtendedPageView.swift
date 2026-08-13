@@ -19,11 +19,6 @@ struct ExtendedPageView: View {
     var onPrevDay: (() -> Void)? = nil
     var onNextDay: (() -> Void)? = nil
     var onJumpToToday: (() -> Void)? = nil
-    /// Passed down from `EditablePageView` so the task list, note box, and
-    /// tear button here are recognized as the same elements as their
-    /// compact-mode counterparts — see the doc comment on
-    /// `EditablePageView.transitionNamespace`.
-    var transitionNamespace: Namespace.ID
 
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
     @State private var isEditingNote = false
@@ -105,12 +100,9 @@ struct ExtendedPageView: View {
     private var rightPane: some View {
         VStack(alignment: .leading, spacing: 24) {
             taskSection
-                .matchedGeometryEffect(id: "tasks", in: transitionNamespace)
             HairlineDivider()
             noteSection
-                .matchedGeometryEffect(id: "note", in: transitionNamespace)
             tearButton
-                .matchedGeometryEffect(id: "tearButton", in: transitionNamespace)
         }
         .padding(32)
         // Extra top clearance: the corner icon cluster (Today/Archive)
@@ -196,7 +188,14 @@ struct ExtendedPageView: View {
                             noteFocused = editing
                         }
                         .onChange(of: noteFocused) { _, focused in
-                            if !focused { isEditingNote = false }
+                            // Mirrors both ways — see MemoBox.swift's identical
+                            // fix for why focus-lost-only wasn't enough: an
+                            // empty note shows this editor from `isEmpty`
+                            // alone, so the first keystroke that makes it
+                            // non-empty was collapsing the editor back to the
+                            // preview (isEditingNote was never actually set)
+                            // and dropping focus mid-keystroke.
+                            isEditingNote = focused
                         }
                 } else {
                     Button {
@@ -279,6 +278,10 @@ struct ExtendedPageView: View {
                         Spacer()
                     }
                     .padding(.vertical, 10)
+                    // See OnboardingView's identical fix: Spacers paint
+                    // nothing, so without this only the Text label was
+                    // actually clickable, not the full button width.
+                    .contentShape(Rectangle())
                     .overlay(Rectangle().stroke(DS.text, lineWidth: 1))
                 }
                 .buttonStyle(.plain)

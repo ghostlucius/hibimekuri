@@ -36,6 +36,19 @@ enum WindowMetrics {
 extension Notification.Name {
     static let taskInteractionReset = Notification.Name("taskInteractionReset")
     static let taskNotificationAuthorizationChanged = Notification.Name("taskNotificationAuthorizationChanged")
+    /// Posted by `AppDelegate.windowDidEndLiveResize` the instant it decides
+    /// which side of the compact/extended dead zone to snap to — *before*
+    /// starting the window-frame animation, not after. `EditablePageView`
+    /// listens for this so its own content crossfade starts at the same
+    /// moment the window starts growing/shrinking, instead of waiting for
+    /// `GeometryReader`'s live width to actually cross the threshold. That
+    /// crossing only happens once the window animation reaches its target —
+    /// and the target *is* the threshold value itself — so without this,
+    /// the window visibly resizes for the whole animation with the content
+    /// unchanged, and the content transition only starts right at the very
+    /// end: a dead "pause" followed by a late, stiff-feeling fade, not one
+    /// smooth simultaneous motion.
+    static let layoutModeWillSnap = Notification.Name("layoutModeWillSnap")
 }
 
 /// `swift run` launches this without a proper .app bundle, so AppKit never
@@ -47,6 +60,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         AppearanceController.applyStoredPreference()
         AppIconManager.start()
         TaskNotificationScheduler.requestAuthorization()
+        // Builds the current theme's illustration bitmap in the background
+        // now, so the first expand into the extended layout finds it ready
+        // instead of paying ~190ms of rasterization mid-transition. See
+        // IllustrationLoader.
+        IllustrationLoader.warm(ThemeManager.shared.illustrationName)
         installFocusResignOnOutsideClick()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -56,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // size the *very first* test launch used, ignoring any later
             // frame/size changes in code. Opting this window out of that
             // system entirely is what makes .frame()/.defaultSize() in
-            // TearOffDiaryApp actually the source of truth going forward.
+            // HibimekuriApp actually the source of truth going forward.
             window.isRestorable = false
             window.delegate = self
         }
@@ -150,12 +168,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         var newFrame = window.frame
         newFrame.size.width = targetWidth
+        // Fired before the window frame itself starts moving — see
+        // .layoutModeWillSnap's doc comment for why this has to lead the
+        // animation, not follow it.
+        NotificationCenter.default.post(
+            name: .layoutModeWillSnap, object: nil,
+            userInfo: ["isExtended": targetWidth == extendedMin]
+        )
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             window.setFrame(newFrame, display: true)
             return
         }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.22
+            // Paced to sit just inside the content crossfade's 0.65s (see
+            // EditablePageView) so the window finishes gliding a beat
+            // before the fade settles, rather than snapping to its new
+            // width while the content is still dissolving.
+            context.duration = 0.5
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             context.allowsImplicitAnimation = true
             window.animator().setFrame(newFrame, display: true)
         }
@@ -163,14 +193,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 }
 
 @main
-struct TearOffDiaryApp: App {
+struct HibimekuriApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage("appAppearance") private var appearance: AppAppearance = .system
+    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @Environment(\.openWindow) private var openWindow
 
     let quoteStore = QuoteStore()
     let diaryStore = DiaryStore()
     let taskStore = TaskStore()
     let wordStore = WordStore()
+    let customQuoteStore = CustomQuoteStore()
     let themeManager = ThemeManager.shared
 
     var body: some Scene {
@@ -180,6 +213,7 @@ struct TearOffDiaryApp: App {
                 .environment(diaryStore)
                 .environment(taskStore)
                 .environment(wordStore)
+                .environment(customQuoteStore)
                 .environment(themeManager)
                 // No SwiftUI-level maxWidth here — that would be a single
                 // static number, but the ceiling that actually makes sense
@@ -194,12 +228,29 @@ struct TearOffDiaryApp: App {
                 }
         }
         .defaultSize(width: WindowMetrics.defaultSize.width, height: WindowMetrics.defaultSize.height)
+        // Replaces the default empty "About Hibimekuri" app-menu item with
+        // one that opens the real AboutView window below — the standard
+        // SwiftUI-supported way to customize it (macOS 13+), no AppKit
+        // menu-item hacking needed.
+        .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button(Localizer.t("日々めくりについて", "About Hibimekuri", language: language)) {
+                    openWindow(id: "about")
+                }
+            }
+        }
+
+        Window(Localizer.t("日々めくりについて", "About Hibimekuri", language: language), id: "about") {
+            AboutView()
+        }
+        .windowResizability(.contentSize)
 
         Settings {
             SettingsView()
                 .environment(diaryStore)
                 .environment(quoteStore)
                 .environment(taskStore)
+                .environment(customQuoteStore)
                 .environment(themeManager)
         }
     }

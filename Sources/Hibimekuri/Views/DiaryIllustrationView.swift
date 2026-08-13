@@ -32,10 +32,16 @@ struct DiaryIllustrationView: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isVisible = false
+    /// Rasterized bitmap, resolved asynchronously by `IllustrationLoader`
+    /// (seeded synchronously from its cache when already warm, so a
+    /// re-expand doesn't re-fade from nothing). Never loaded inline in
+    /// `body` — see `IllustrationLoader` for the measured reason why doing
+    /// that stalled the whole compact→extended transition.
+    @State private var image: NSImage?
 
     var body: some View {
         Group {
-            if let name = themeManager.illustrationName, let nsImage = Self.loadSVG(named: name) {
+            if let nsImage = image {
                 // `.aspectRatio(.fill)` alone doesn't reliably negotiate a
                 // size when its parent offers a flexible (`maxHeight:
                 // .infinity`) proposal — confirmed by testing at a tall
@@ -96,7 +102,9 @@ struct DiaryIllustrationView: View {
                 // isolated test that found the bug in the first place.
                 .overlay(DS.paper.opacity(isVisible ? 0 : 1))
                 .allowsHitTesting(false)
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.5), value: isVisible)
+                // Slightly longer than the pane's own crossfade so the
+                // illustration settles in last rather than racing it.
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.8), value: isVisible)
                 .onAppear {
                     isVisible = reduceMotion
                     // Deferred to the next run loop tick rather than set
@@ -114,17 +122,48 @@ struct DiaryIllustrationView: View {
                     isVisible = false
                 }
                 .accessibilityHidden(true)
+            } else {
+                // Deliberately NOT just omitting the else branch. A `Group`
+                // whose conditional content is empty (no real painted view
+                // at all) turned out not to reliably fire `.onAppear` —
+                // confirmed with direct instrumentation: `body` itself ran,
+                // but `.onAppear`/`.task` attached to the outer `Group`
+                // never did, in a case that reproduced every time. Giving
+                // the empty state a real, if invisible, view gives SwiftUI
+                // something concrete to track as "appeared."
+                Color.clear
             }
         }
+        .onAppear { loadIfNeeded() }
+        .onChange(of: themeManager.illustrationName) { _, _ in loadIfNeeded() }
     }
 
-    private static var cache: [String: NSImage] = [:]
-
-    private static func loadSVG(named name: String) -> NSImage? {
-        if let cached = cache[name] { return cached }
-        guard let url = Bundle.module.url(forResource: name, withExtension: "svg"),
-              let image = NSImage(contentsOf: url) else { return nil }
-        cache[name] = image
-        return image
+    // `.task(id:)` was tried here first and, in practice, never fired at
+    // all for this specific view — confirmed with direct instrumentation:
+    // `body` itself evaluated (twice, both very early during the app's
+    // initial view-tree construction, both with `image` still nil), but no
+    // `.task` closure ever ran, not even once, including after later
+    // resizes that did re-evaluate `body`. Likely cause: those first two
+    // evaluations happened during a preliminary layout/measurement pass
+    // (this view sits three `GeometryReader`s deep — TodayView's,
+    // EditablePageView's, ExtendedPageView.leftPane's), and `.task`'s
+    // lifecycle apparently didn't attach during it, while SwiftUI's own
+    // diffing then treated the subtree as unchanged on every subsequent
+    // real render and never gave `.task` another chance to run. `.onAppear`
+    // + `.onChange`, with the load kicked off manually here rather than
+    // through a lifecycle modifier's own scheduling, doesn't depend on
+    // guessing which pass SwiftUI considers "the real one."
+    private func loadIfNeeded() {
+        guard let name = themeManager.illustrationName else {
+            image = nil
+            return
+        }
+        if let warm = IllustrationLoader.cached(name) {
+            image = warm
+            return
+        }
+        Task {
+            image = await IllustrationLoader.load(name)
+        }
     }
 }
