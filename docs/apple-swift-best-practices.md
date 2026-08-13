@@ -1,7 +1,7 @@
 # Apple Swift/SwiftUI Best Practices — Reference for Code Review
 
 This document exists for one purpose: to give a code-reviewing agent (or a human) a
-concrete, checkable standard to hold `TearOffDiary` against. Every section below is
+concrete, checkable standard to hold `Hibimekuri` against. Every section below is
 either sourced directly from Apple's own developer documentation (linked), or marked
 as general Swift-community style guidance where it isn't.
 
@@ -28,11 +28,11 @@ Source: [Building a universal macOS binary](https://developer.apple.com/document
   ```bash
   swift build -c release --arch arm64
   swift build -c release --arch x86_64
-  lipo -create -output TearOffDiary \
-    .build/arm64-apple-macosx/release/TearOffDiary \
-    .build/x86_64-apple-macosx/release/TearOffDiary
+  lipo -create -output Hibimekuri \
+    .build/arm64-apple-macosx/release/Hibimekuri \
+    .build/x86_64-apple-macosx/release/Hibimekuri
   ```
-- **Verified finding for this project (2026-08-11):** `dist/TearOffDiary.app`'s binary
+- **Verified finding for this project (2026-08-11):** `dist/Hibimekuri.app`'s binary
   is `arm64` only. On an Intel Mac this app does not launch at all. If any recipient of
   this build might be on an Intel Mac, `scripts/build_dmg.sh` needs the lipo step above.
 - Wrap genuinely architecture-specific code (rare in a SwiftUI CRUD app like this one)

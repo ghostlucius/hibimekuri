@@ -114,7 +114,7 @@ struct TaskListView: View {
         }
         // Things-style "click anywhere else closes/deselects it": this
         // fires on every mouse-down in the whole app (see
-        // TearOffDiaryApp.swift), before whatever row was actually clicked
+        // HibimekuriApp.swift), before whatever row was actually clicked
         // (if any) gets to reselect/reopen itself right after — so clicking
         // a different task cleanly switches to it, and clicking anything
         // that isn't a task row (the memo, the header, blank space) just

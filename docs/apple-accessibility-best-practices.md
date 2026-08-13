@@ -1,11 +1,11 @@
 # Apple Accessibility & Inclusion — Reference for Audit
 
 This document exists to give an auditing agent (or a human) a concrete, checkable
-standard for TearOffDiary's accessibility. Every section is sourced directly from
+standard for Hibimekuri's accessibility. Every section is sourced directly from
 Apple's own documentation/HIG (linked), scoped to what actually applies to this
 project: a **macOS-only SwiftUI app** with one piece of real AppKit interop
 (`AppKitTaskTable`, a raw `NSTableView` wrapper used for drag-and-drop task reordering
-— see `Sources/TearOffDiary/Views/AppKitTaskTable.swift`). iOS/iPadOS/tvOS/watchOS/
+— see `Sources/Hibimekuri/Views/AppKitTaskTable.swift`). iOS/iPadOS/tvOS/watchOS/
 visionOS-specific guidance (gestures, Assistive Access, Apple Watch control sizes,
 etc.) does not apply here and should not be flagged.
 
@@ -68,7 +68,7 @@ Source: [Accessibility (HIG)](https://developer.apple.com/design/human-interface
   so its keyboard accessibility (if any) had to be built by hand, not inherited for
   free the way a plain SwiftUI `List` would get it.
 - **Don't override system-defined keyboard shortcuts.** Check any custom keyboard
-  handling (`NSEvent.addLocalMonitorForEvents` in `TearOffDiaryApp.swift`, if any
+  handling (`NSEvent.addLocalMonitorForEvents` in `HibimekuriApp.swift`, if any
   shortcut-like key handling exists) doesn't clash with standard system shortcuts.
 
 ## 3. Cognitive

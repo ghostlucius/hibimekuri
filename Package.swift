@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "TearOffDiary",
+    name: "Hibimekuri",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "TearOffDiary",
+            name: "Hibimekuri",
             resources: [.process("Resources")]
         )
     ]

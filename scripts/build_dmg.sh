@@ -15,7 +15,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="Hibimekuri"
-EXECUTABLE_NAME="TearOffDiary"
 BUNDLE_ID="com.himekuri.tearoffdiary"
 VERSION="1.0.0"
 DIST_DIR="dist"
@@ -45,12 +44,12 @@ swift build -c release --arch x86_64
 echo "==> Assembling $APP_NAME.app (staged outside iCloud Drive at $STAGING_ROOT)"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
-lipo -create -output "$APP_DIR/Contents/MacOS/$EXECUTABLE_NAME" \
-    ".build/arm64-apple-macosx/release/$EXECUTABLE_NAME" \
-    ".build/x86_64-apple-macosx/release/$EXECUTABLE_NAME"
-lipo "$APP_DIR/Contents/MacOS/$EXECUTABLE_NAME" -verify_arch arm64 x86_64
+lipo -create -output "$APP_DIR/Contents/MacOS/$APP_NAME" \
+    ".build/arm64-apple-macosx/release/$APP_NAME" \
+    ".build/x86_64-apple-macosx/release/$APP_NAME"
+lipo "$APP_DIR/Contents/MacOS/$APP_NAME" -verify_arch arm64 x86_64
 
-RESOURCE_BUNDLE=".build/arm64-apple-macosx/release/${EXECUTABLE_NAME}_${EXECUTABLE_NAME}.bundle"
+RESOURCE_BUNDLE=".build/arm64-apple-macosx/release/${APP_NAME}_${APP_NAME}.bundle"
 if [ -d "$RESOURCE_BUNDLE" ]; then
     cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
 fi
@@ -82,7 +81,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>CFBundleShortVersionString</key>
     <string>$VERSION</string>
     <key>CFBundleExecutable</key>
-    <string>$EXECUTABLE_NAME</string>
+    <string>$APP_NAME</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
