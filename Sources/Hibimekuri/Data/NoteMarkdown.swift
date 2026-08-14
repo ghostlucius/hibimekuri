@@ -45,6 +45,7 @@ struct NoteBlockStyleKey: AttributedStringKey {
 /// corrupting it.
 enum NoteMarkdown {
     private static let appKitBlockStyleKey = NSAttributedString.Key("com.hibimekuri.noteBlockStyle")
+    private static let appKitInlineIntentKey = NSAttributedString.Key("com.hibimekuri.inlinePresentationIntent")
 
     static func parse(_ markdown: String) -> AttributedString {
         guard !markdown.isEmpty else { return AttributedString("") }
@@ -218,6 +219,13 @@ enum NoteMarkdown {
             if let style = run[NoteBlockStyleKey.self], length > 0 {
                 native.addAttribute(appKitBlockStyleKey, value: style.rawValue, range: NSRange(location: location, length: length))
             }
+            if let intent = run.inlinePresentationIntent, length > 0 {
+                native.addAttribute(
+                    appKitInlineIntentKey,
+                    value: String(intent.rawValue),
+                    range: NSRange(location: location, length: length)
+                )
+            }
             location += length
         }
         return native
@@ -236,6 +244,15 @@ enum NoteMarkdown {
                   let upper = AttributedString.Index(stringRange.upperBound, within: attributed),
                   lower < upper else { return }
             attributed[lower..<upper][NoteBlockStyleKey.self] = style
+        }
+        native.enumerateAttribute(appKitInlineIntentKey, in: fullRange) { value, range, _ in
+            guard let rawValue = value as? String,
+                  let rawIntent = UInt(rawValue),
+                  let stringRange = Range(range, in: plainText),
+                  let lower = AttributedString.Index(stringRange.lowerBound, within: attributed),
+                  let upper = AttributedString.Index(stringRange.upperBound, within: attributed),
+                  lower < upper else { return }
+            attributed[lower..<upper].inlinePresentationIntent = InlinePresentationIntent(rawValue: rawIntent)
         }
         return attributed
     }

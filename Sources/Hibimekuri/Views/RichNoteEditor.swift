@@ -138,9 +138,10 @@ private struct AppKitRichTextEditor: NSViewRepresentable {
             return NSRange(location: location, length: min(selection.length, textLength - location))
         }
 
-        /// The stored Markdown has no visual colors of its own. Apply the
-        /// terminal-like code treatment only at the AppKit rendering edge so
-        /// the saved source stays portable Markdown.
+        /// Resolve stored Markdown attributes to native AppKit attributes at
+        /// the rendering edge. The storage remains portable Markdown; this
+        /// is what makes its supported structure visibly real in formatted
+        /// mode rather than merely preserving invisible metadata.
         private func styledText(from attributed: AttributedString) -> NSAttributedString {
             let native = NSMutableAttributedString(
                 attributedString: NoteMarkdown.appKitAttributedString(from: attributed)
@@ -148,22 +149,78 @@ private struct AppKitRichTextEditor: NSViewRepresentable {
             let fullRange = NSRange(location: 0, length: native.length)
             guard fullRange.length > 0 else { return native }
 
-            var codeRanges: [NSRange] = []
-            native.enumerateAttribute(
-                AppKitRichTextEditor.blockStyleAttribute,
-                in: fullRange
-            ) { value, range, _ in
-                guard value as? String == NoteBlockStyle.code.rawValue else { return }
-                codeRanges.append(range)
-            }
-            for range in codeRanges {
-                native.addAttributes([
-                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
-                    .foregroundColor: NSColor(calibratedWhite: 0.92, alpha: 1),
-                    .backgroundColor: NSColor(calibratedWhite: 0.12, alpha: 1)
-                ], range: range)
+            var location = 0
+            for run in attributed.runs {
+                let runText = String(attributed[run.range].characters)
+                let length = (runText as NSString).length
+                defer { location += length }
+                guard length > 0 else { continue }
+
+                let range = NSRange(location: location, length: length)
+                let style = run[NoteBlockStyleKey.self] ?? .body
+                let intent = run.inlinePresentationIntent ?? []
+                let isCode = style == .code
+
+                if isCode {
+                    native.addAttributes([
+                        .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+                        .foregroundColor: NSColor(calibratedWhite: 0.92, alpha: 1),
+                        .backgroundColor: NSColor(calibratedWhite: 0.12, alpha: 1)
+                    ], range: range)
+                    continue
+                }
+
+                var font = font(for: style)
+                if intent.contains(.stronglyEmphasized) {
+                    font = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
+                }
+                if intent.contains(.emphasized) {
+                    font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
+                }
+
+                let isStruck = intent.contains(.strikethrough) || run.strikethroughStyle != nil
+                let isLink = run.link != nil
+                native.addAttribute(.font, value: font, range: range)
+                native.addAttribute(
+                    .foregroundColor,
+                    value: isLink ? NSColor(parent.palette.accentStrong) : (isStruck ? NSColor(parent.palette.textSecondary) : foregroundColor(for: style)),
+                    range: range
+                )
+
+                if isStruck {
+                    native.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: range)
+                }
+                if let link = run.link {
+                    native.addAttribute(.link, value: link, range: range)
+                    native.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range)
+                }
+                if style == .blockquote {
+                    native.addAttribute(.paragraphStyle, value: blockquoteParagraphStyle, range: range)
+                }
             }
             return native
+        }
+
+        private func font(for style: NoteBlockStyle) -> NSFont {
+            switch style {
+            case .h1: return NSFont.systemFont(ofSize: 17, weight: .bold)
+            case .h2: return NSFont.systemFont(ofSize: 15, weight: .bold)
+            case .h3: return NSFont.systemFont(ofSize: 13, weight: .semibold)
+            case .blockquote: return NSFontManager.shared.convert(NSFont.systemFont(ofSize: 12), toHaveTrait: .italicFontMask)
+            case .body, .code: return NSFont.systemFont(ofSize: 12)
+            }
+        }
+
+        private func foregroundColor(for style: NoteBlockStyle) -> NSColor {
+            style == .blockquote ? NSColor(parent.palette.textSecondary) : NSColor(parent.palette.textPrimary)
+        }
+
+        private var blockquoteParagraphStyle: NSParagraphStyle {
+            let style = NSMutableParagraphStyle()
+            style.firstLineHeadIndent = 14
+            style.headIndent = 14
+            style.paragraphSpacing = 3
+            return style
         }
     }
 }
@@ -278,18 +335,40 @@ private struct NoteFormattingToolbar: View {
     }
 
     private func header(_ level: Int) {
-        mutateSelection { updated, range in
-            let style: NoteBlockStyle = level == 1 ? .h1 : (level == 2 ? .h2 : .h3)
-            updated[range].font = NoteMarkdown.headerFont(level: level)
-            updated[range][NoteBlockStyleKey.self] = style
+        let ranges = selectedLineRanges(in: text)
+        guard !ranges.isEmpty else { return }
+        let style: NoteBlockStyle = level == 1 ? .h1 : (level == 2 ? .h2 : .h3)
+        let removesHeader = ranges.allSatisfy { text[$0][NoteBlockStyleKey.self] == style }
+        var updated = text
+        for range in ranges {
+            if removesHeader {
+                updated[range].font = nil
+                updated[range][NoteBlockStyleKey.self] = .body
+            } else {
+                updated[range].font = NoteMarkdown.headerFont(level: level)
+                updated[range][NoteBlockStyleKey.self] = style
+            }
         }
+        text = updated
+        DispatchQueue.main.async { controller.focus() }
     }
 
     private func blockquote() {
-        mutateSelection { updated, range in
-            updated[range].foregroundColor = .secondary
-            updated[range][NoteBlockStyleKey.self] = .blockquote
+        let ranges = selectedLineRanges(in: text)
+        guard !ranges.isEmpty else { return }
+        let removesQuote = ranges.allSatisfy { text[$0][NoteBlockStyleKey.self] == .blockquote }
+        var updated = text
+        for range in ranges {
+            if removesQuote {
+                updated[range].foregroundColor = nil
+                updated[range][NoteBlockStyleKey.self] = .body
+            } else {
+                updated[range].foregroundColor = .secondary
+                updated[range][NoteBlockStyleKey.self] = .blockquote
+            }
         }
+        text = updated
+        DispatchQueue.main.async { controller.focus() }
     }
 
     private func beginLink() {
@@ -449,6 +528,9 @@ private struct NoteFormattingToolbar: View {
 /// Makes the visible task-list marker in formatted notes behave like a real
 /// checkbox without changing the literal Markdown editor.
 private final class ChecklistTextView: NSTextView {
+    private static let blockStyleAttribute = NSAttributedString.Key("com.hibimekuri.noteBlockStyle")
+    private static let inlineIntentAttribute = NSAttributedString.Key("com.hibimekuri.inlinePresentationIntent")
+
     override func mouseDown(with event: NSEvent) {
         guard let layoutManager, let textContainer else {
             super.mouseDown(with: event)
@@ -488,6 +570,35 @@ private final class ChecklistTextView: NSTextView {
             attributes: attributes
         )
         textStorage.replaceCharacters(in: checkboxRange, with: replacement)
+        didChangeText()
+    }
+
+    /// Block and inline formats are explicit, selection-based commands in
+    /// this editor. Return always starts a clean body line instead of
+    /// inheriting a heading, quote, code block, link, or emphasis.
+    override func insertNewline(_ sender: Any?) {
+        super.insertNewline(sender)
+
+        let cursor = selectedRange().location
+        guard cursor > 0, let textStorage else { return }
+        let newlineRange = NSRange(location: cursor - 1, length: 1)
+        textStorage.removeAttribute(Self.inlineIntentAttribute, range: newlineRange)
+        textStorage.removeAttribute(.backgroundColor, range: newlineRange)
+        textStorage.removeAttribute(.strikethroughStyle, range: newlineRange)
+        textStorage.removeAttribute(.underlineStyle, range: newlineRange)
+        textStorage.removeAttribute(.link, range: newlineRange)
+        textStorage.removeAttribute(.paragraphStyle, range: newlineRange)
+        textStorage.addAttributes([
+            Self.blockStyleAttribute: NoteBlockStyle.body.rawValue,
+            .font: NSFont.systemFont(ofSize: 12),
+            .foregroundColor: textColor ?? .labelColor
+        ], range: newlineRange)
+
+        typingAttributes = [
+            Self.blockStyleAttribute: NoteBlockStyle.body.rawValue,
+            .font: NSFont.systemFont(ofSize: 12),
+            .foregroundColor: textColor ?? .labelColor
+        ]
         didChangeText()
     }
 }

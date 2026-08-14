@@ -6,6 +6,9 @@ import SwiftUI
 struct MarkdownNotesField: View {
     @Binding var text: String
     var placeholder: String
+    var sectionTitle: String? = nil
+    var minEditorHeight: CGFloat = 96
+    var maxEditorHeight: CGFloat? = 180
 
     @Environment(FocusModeController.self) private var focusMode
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
@@ -14,6 +17,12 @@ struct MarkdownNotesField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
+                if let sectionTitle {
+                    Text(sectionTitle)
+                        .font(DS.smallCaption)
+                        .foregroundStyle(.secondary)
+                        .tracking(1.2)
+                }
                 Spacer()
 
                 Button {
@@ -67,7 +76,7 @@ struct MarkdownNotesField: View {
                         .allowsHitTesting(false)
                 }
             }
-            .frame(minHeight: 96, maxHeight: 180)
+            .frame(minHeight: minEditorHeight, maxHeight: maxEditorHeight)
             .padding(5)
             .overlay(Rectangle().stroke(DS.hairline, lineWidth: 1))
         }
