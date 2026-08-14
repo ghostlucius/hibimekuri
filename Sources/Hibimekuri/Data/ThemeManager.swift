@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Owns the active `DiaryTheme` (Classic/Matcha/Washi/Sumi/Zen/Sakura) and
+/// Owns the active `DiaryTheme` (Classic/Matcha/Washi/Zen/Sakura) and
 /// resolves it, together with the current light/dark scheme, into a
 /// `ThemePalette` that `DS` reads from.
 ///
@@ -34,8 +34,16 @@ final class ThemeManager {
     var systemColorScheme: ColorScheme = .light
 
     private init() {
-        let saved = UserDefaults.standard.string(forKey: Self.storageKey) ?? DiaryTheme.classic.rawValue
-        self.theme = DiaryTheme(rawValue: saved) ?? .classic
+        let defaults = UserDefaults.standard
+        let saved = defaults.string(forKey: Self.storageKey) ?? DiaryTheme.classic.rawValue
+        // This neutral theme was originally called Sumi. Persist its new
+        // Classic name so Sumi is available for a distinct future theme.
+        if saved == "sumi" {
+            self.theme = .classic
+            defaults.set(DiaryTheme.classic.rawValue, forKey: Self.storageKey)
+        } else {
+            self.theme = DiaryTheme(rawValue: saved) ?? .classic
+        }
     }
 
     var currentPalette: ThemePalette {

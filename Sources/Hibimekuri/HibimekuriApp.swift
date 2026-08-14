@@ -133,7 +133,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     window.makeFirstResponder(nil)
                 }
             }
-            NotificationCenter.default.post(name: .taskInteractionReset, object: nil)
             return event
         }
     }

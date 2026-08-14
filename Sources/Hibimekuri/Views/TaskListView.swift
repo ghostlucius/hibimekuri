@@ -2,8 +2,7 @@ import SwiftUI
 
 /// A persistent task list, independent of any single diary day: items
 /// carry forward until checked off instead of resetting, and each task
-/// can expand into a Things-style checklist of sub-steps, a notes field,
-/// and a "do later" defer date.
+/// can expand into a notes field and a "do later" defer date.
 struct TaskListView: View {
     @Environment(TaskStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -44,11 +43,11 @@ struct TaskListView: View {
     /// PreferenceKey content measurement — that exact technique already
     /// failed silently once in this codebase (see requirements.md "round
     /// 3": the measured value stayed 0 for reasons never root-caused). If
-    /// a task's expanded checklist runs long enough to exceed this, the
+    /// a task's editor runs long enough to exceed this, the
     /// table falls back to its own small internal scrollbar rather than
     /// clipping anything, which is a safe degradation, not a broken one.
     private func estimatedHeight(for group: [TaskItem], expanded: UUID?) -> CGFloat {
-        let collapsedRowHeight: CGFloat = 32
+        let collapsedRowHeight: CGFloat = 28
         let expandedExtra: CGFloat = 170
         let hasExpanded = expanded.map { id in group.contains { $0.id == id } } ?? false
         return CGFloat(group.count) * collapsedRowHeight + (hasExpanded ? expandedExtra : 0)
@@ -70,16 +69,28 @@ struct TaskListView: View {
             // Active and done get their own table each, since reordering
             // must never cross that boundary.
             if !activeTasks.isEmpty {
-                AppKitTaskTable(items: activeTasks, taskStore: store, onReorder: { reordered in
-                    store.reorder(reordered)
-                }) { task in row(task) }
-                    .frame(height: estimatedHeight(for: activeTasks, expanded: expandedTaskID))
+                if expandedTaskID == nil {
+                    AppKitTaskTable(items: activeTasks, taskStore: store, onReorder: { reordered in
+                        store.reorder(reordered)
+                    }) { task in row(task) }
+                        .frame(height: estimatedHeight(for: activeTasks, expanded: nil))
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(activeTasks) { task in row(task) }
+                    }
+                }
             }
             if !doneTasks.isEmpty {
-                AppKitTaskTable(items: doneTasks, taskStore: store, onReorder: { reordered in
-                    store.reorder(reordered)
-                }) { task in row(task) }
-                    .frame(height: estimatedHeight(for: doneTasks, expanded: expandedTaskID))
+                if expandedTaskID == nil {
+                    AppKitTaskTable(items: doneTasks, taskStore: store, onReorder: { reordered in
+                        store.reorder(reordered)
+                    }) { task in row(task) }
+                        .frame(height: estimatedHeight(for: doneTasks, expanded: nil))
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(doneTasks) { task in row(task) }
+                    }
+                }
             }
 
             HStack(spacing: 8) {
@@ -108,7 +119,9 @@ struct TaskListView: View {
                 if showDeferred {
                     // No reordering for deferred tasks (never had it, even
                     // before this rewrite), so plain rows are fine here.
-                    ForEach(deferredTasks) { task in row(task) }
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(deferredTasks) { task in row(task) }
+                    }
                 }
             }
         }
@@ -123,6 +136,15 @@ struct TaskListView: View {
             selectedTaskID = nil
             expandedTaskID = nil
         }
+        // This background is intentionally limited to the task section.
+        // It receives clicks only in unused task-area space; controls and
+        // editors above it keep their own interactions. That mirrors the
+        // task-list-only dismissal boundary used by Things.
+        .background {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { closeExpandedTask() }
+        }
     }
 
     private func row(_ task: TaskItem) -> some View {
@@ -130,8 +152,26 @@ struct TaskListView: View {
             task: task,
             isExpanded: expandedTaskID == task.id,
             isSelected: selectedTaskID == task.id,
-            onOpen: { expandedTaskID = task.id },
-            onSelect: { selectedTaskID = task.id }
+            onOpen: {
+                if expandedTaskID == task.id {
+                    expandedTaskID = nil
+                } else {
+                    selectedTaskID = task.id
+                    expandedTaskID = task.id
+                }
+            },
+            onSelect: {
+                // A click in the unused part of the open row is the
+                // task-section's explicit dismissal affordance. Native
+                // controls in the row (title, checkbox, delete) retain
+                // their own handling and do not take this route.
+                if expandedTaskID == task.id {
+                    closeExpandedTask()
+                } else {
+                    selectedTaskID = task.id
+                    expandedTaskID = nil
+                }
+            }
         )
     }
 
@@ -139,6 +179,11 @@ struct TaskListView: View {
         store.add(title: newTaskText)
         newTaskText = ""
         fieldFocused = true
+    }
+
+    private func closeExpandedTask() {
+        selectedTaskID = nil
+        expandedTaskID = nil
     }
 }
 
@@ -178,11 +223,8 @@ private struct TaskRow: View {
     @Environment(TaskStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
-    @State private var newStepText = ""
     @State private var showDatePicker = false
     @State private var pendingDeferDate = Date()
-    @State private var isEditingTitle = false
-    @FocusState private var stepFieldFocused: Bool
     @FocusState private var titleFocused: Bool
 
     private var notesBinding: Binding<String> {
@@ -255,11 +297,6 @@ private struct TaskRow: View {
                         .foregroundStyle(badge.isOverdue ? Color.red : DS.textSecondary)
                 }
 
-                if !task.checklist.isEmpty {
-                    Text(verbatim: "\(task.checklist.filter { $0.isDone }.count)/\(task.checklist.count)")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                }
 
                 IconButton(
                     systemName: "xmark",
@@ -273,13 +310,10 @@ private struct TaskRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(isSelected ? DS.selection : Color.clear)
             .contentShape(Rectangle())
-            // Double-click always opens (never toggles closed) — closing
-            // only happens by clicking elsewhere (see taskInteractionReset).
             .onTapGesture(count: 2) {
-                startRename()
+                onOpen()
             }
             .onTapGesture(count: 1) {
-                guard !isEditingTitle else { return }
                 onSelect()
             }
             // Dragging is handled entirely by the enclosing
@@ -292,50 +326,6 @@ private struct TaskRow: View {
 
                     deferRow
 
-                    ForEach(task.checklist) { item in
-                        HStack(spacing: 4) {
-                            IconButton(
-                                systemName: item.isDone ? "checkmark.square" : "square",
-                                accessibilityLabel: item.isDone
-                                    ? Localizer.t("ステップを未完了にする", "Mark step incomplete", language: language)
-                                    : Localizer.t("ステップを完了", "Complete step", language: language),
-                                size: 11,
-                                color: item.isDone ? .primary : .secondary
-                            ) {
-                                store.toggleChecklistItem(taskId: task.id, itemId: item.id)
-                            }
-
-                            Text(item.title)
-                                .font(.system(size: 12))
-                                .strikethrough(item.isDone)
-                                .foregroundStyle(item.isDone ? .secondary : .primary)
-
-                            Spacer()
-
-                            IconButton(
-                                systemName: "xmark",
-                                accessibilityLabel: Localizer.t("ステップを削除", "Delete step", language: language),
-                                size: 9
-                            ) {
-                                store.deleteChecklistItem(taskId: task.id, itemId: item.id)
-                            }
-                        }
-                    }
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                        TextField(Localizer.t("ステップを追加", "Add a step", language: language), text: $newStepText)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12))
-                            .focused($stepFieldFocused)
-                            .onSubmit {
-                                store.addChecklistItem(taskId: task.id, title: newStepText)
-                                newStepText = ""
-                                stepFieldFocused = true
-                            }
-                    }
                 }
                 .padding(.leading, 22)
             }
@@ -392,12 +382,6 @@ private struct TaskRow: View {
         store.update(updated)
     }
 
-    /// Plain text until a double-click on the row starts a rename — a
-    /// single click now only selects (see `body`), so the title can't stay
-    /// an always-live `TextField` the way it used to. Done tasks stay a
-    /// plain strikethrough Text always: renaming something already
-    /// finished isn't wired up, and `.strikethrough` doesn't render on a
-    /// `TextField` anyway.
     private var titleView: some View {
         Group {
             if task.isDone {
@@ -409,32 +393,14 @@ private struct TaskRow: View {
                 .accessibilityAction(named: Localizer.t("詳細を表示", "Show details", language: language)) {
                     onOpen()
                 }
-            } else if isEditingTitle {
+            } else if isExpanded {
                 TextField("", text: titleBinding)
                     .textFieldStyle(.plain)
                     .foregroundStyle(.primary)
                     .focused($titleFocused)
                     .accessibilityLabel(Localizer.t("タスク名", "Task title", language: language))
-                    // Deferred to the next run-loop turn, not set
-                    // synchronously — double-click fires onOpen() (which
-                    // expands the whole notes/checklist section below, a
-                    // real layout change) in the very same handler that
-                    // starts this rename, and requesting focus in the same
-                    // transaction as that layout change is a known SwiftUI/
-                    // macOS race: the focus request can silently get
-                    // dropped while the view hierarchy is mid-rebuild.
-                    // Confirmed via real click/drag testing — this isn't
-                    // theoretical, it reliably left the field looking
-                    // editable but not actually focused.
-                    .onChange(of: isEditingTitle, initial: true) { _, editing in
-                        if editing {
-                            DispatchQueue.main.async { titleFocused = true }
-                        } else {
-                            titleFocused = false
-                        }
-                    }
-                    .onChange(of: titleFocused) { _, focused in
-                        if !focused { isEditingTitle = false }
+                    .onAppear {
+                        DispatchQueue.main.async { titleFocused = true }
                     }
             } else {
                 Text(task.title)
@@ -444,31 +410,8 @@ private struct TaskRow: View {
                 .accessibilityAction(named: Localizer.t("詳細を表示", "Show details", language: language)) {
                     onOpen()
                 }
-                .accessibilityAction(named: Localizer.t("名前を変更", "Rename task", language: language)) {
-                    startRename()
-                }
             }
         }
         .font(.system(size: 12))
-        // If the row gets closed from outside (clicking elsewhere resets
-        // the parent's expandedTaskID — see taskInteractionReset), local
-        // rename state has to follow it explicitly: isEditingTitle is this
-        // view's own @State, untouched by that reset, so without this the
-        // title could stay silently "in edit mode" (an unfocused TextField
-        // masquerading as plain text) indefinitely — which is exactly what
-        // made a later click land on stale text-cursor positioning instead
-        // of the row's own tap gesture.
-        .onChange(of: isExpanded) { _, expanded in
-            if !expanded {
-                isEditingTitle = false
-            }
-        }
-    }
-
-    private func startRename() {
-        onOpen()
-        if !task.isDone {
-            isEditingTitle = true
-        }
     }
 }

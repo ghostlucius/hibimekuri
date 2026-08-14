@@ -4,9 +4,34 @@
 
 <h1 align="center">Hibimekuri User Guide</h1>
 
-This guide walks through what Hibimekuri does, feature by feature. For the philosophy
-behind the app and the story of the name, see the "About Hibimekuri" panel in the app
-(Hibimekuri menu → About Hibimekuri) or the [README](../README.md#philosophy).
+This guide walks through what Hibimekuri does, feature by feature.
+
+## Philosophy
+
+A **himekuri** (日めくり) is the paper tear-off calendar that has sat in Japanese homes,
+shops, and offices for generations: one page per day, torn off each morning to reveal
+the next. It was never a specialist's object — local businesses gave them away as
+everyday gifts, and each page carried small, accessible pieces of seasonal awareness
+and everyday wisdom, like a proverb or a lucky-day note, that anyone could read in
+passing. The appeal was never the information by itself; it was the small physical
+ritual of tearing a page away each morning, more deliberate than a glance at a phone
+screen.
+
+**Hibimekuri** (日々めくり) adds the Japanese repetition mark **々** to that idea: **日**
+becomes **日々**, from one day to everyday life. The name suggests turning through the
+days one page at a time — a himekuri for the days you keep.
+
+This app borrows that shape for journaling instead of counting down days. Each page is
+a single sitting: the date, a bit of real calendar detail connecting the day to the
+wider season, a short piece of Japanese literature or idiom, a place to write, and a
+small task list — closed out by a tear-off action that reveals the next day
+underneath. A torn-off page isn't deleted; it moves to the [Archive](#archive), the
+same way you'd keep a stack of paper instead of throwing it away.
+
+That's also why the interface stays plain: minimal chrome, typography-led paper
+surfaces, a dominant date numeral, hairline rules. Hibimekuri is meant to feel closer
+to a physical object on a desk than to software — you can revisit this explanation
+anytime from Hibimekuri menu → About Hibimekuri → "What is a himekuri?"
 
 ## The daily page
 
@@ -22,8 +47,9 @@ Each day is one page. It has four parts:
   an English word of the day, or your own quotes — see [Choosing what the daily
   quote shows](#choosing-what-the-daily-quote-shows).
 - **A memo.** A place to write about your day. Tap it to start typing; tap away to see
-  it rendered. It supports light Markdown — **bold**, *italic*, ~~strikethrough~~,
-  `inline code`, and links.
+  it rendered. It supports Markdown — headers, lists, blockquotes, code blocks,
+  **bold**, *italic*, ~~strikethrough~~, `inline code`, and links. See [Writing in
+  Markdown](#writing-in-markdown) for the full syntax.
 - **A task list.** See [Tasks](#tasks) below.
 
 Tapping the numeral flips it over to show the full current month as a small calendar,
@@ -83,8 +109,14 @@ forward, not something you fill out fresh each morning.
 - **Add a task** with the "+" button or the "Add a task" row.
 - **Check it off** — done tasks stay visible with a strikethrough rather than
   disappearing, so you can see what you got done.
-- **Expand a task** to add a checklist of smaller steps, or a free-text note.
-- **Reorder tasks** by dragging them.
+- **Click a task once** to select it. **Double-click** to expand it and edit its notes
+  or set a defer date. Clicking anywhere else closes it again and saves your changes.
+- **A task's notes field** is the same rich Markdown editor as the daily note — see
+  [Focus Mode and formatted text](#focus-mode-and-formatted-text) and [Writing in
+  Markdown](#writing-in-markdown). This is also where you'd add a checklist of smaller
+  steps for a task, written as Markdown.
+- **Reorder tasks** by dragging them. Reordering is only available while no task is
+  expanded.
 - **"Do later"** — give a task a defer date to hide it from the main list until that
   date arrives. Deferred tasks are still visible behind a small "+N scheduled" link, so
   they're not completely out of sight.
@@ -92,7 +124,74 @@ forward, not something you fill out fresh each morning.
   reminder on the morning it's due. No account or server involved.
 - **Deleting a task** doesn't destroy it right away — it moves to a "Recently deleted"
   list in Settings for a while (you choose how long: 15, 30, or 90 days) in case you
-  want it back.
+  want it back. If you want it gone sooner, "Empty Deleted Tasks…" in that same Settings
+  section removes everything in it immediately.
+
+## Focus Mode and formatted text
+
+The daily note (in the wide-window layout) and each task's notes field share the same
+editor, with two small icons above it:
+
+- **The expand icon** opens **Focus Mode** — a full-window, distraction-free view for
+  writing, with everything else out of the way. Click the same icon again, or press
+  **Escape**, to leave it. Whatever you write is saved to the same note you started
+  from; nothing is lost by entering or leaving.
+- **The formatting icon** switches between two ways of editing the same text:
+  - **Formatted** (the default) — a true WYSIWYG view. Formatting renders live as you
+    apply it; you never see Markdown symbols like `**` or `#`. Select some text and a
+    small floating toolbar appears above it, themed to match your current theme, with
+    buttons for headers (H1/H2/H3), **bold**, *italic*, links, blockquotes, and
+    bulleted/numbered lists.
+  - **Markdown** — the same content shown as raw Markdown source, for typing syntax
+    directly. This is also the only place to write a checklist — see [Writing in
+    Markdown](#writing-in-markdown).
+
+  Switching between the two doesn't change what's saved — it's the same text either
+  way, just shown differently.
+
+The compact-page memo (used when the window is narrow) is simpler by design: it's
+plain-text editing with a read-only rendered preview, no Focus Mode, no toolbar. It
+still understands the same Markdown syntax — see below.
+
+## Writing in Markdown
+
+Wherever Hibimekuri renders Markdown — the daily memo, the wide-window note, task
+notes, and Focus Mode — the same basic syntax works. Type it in plain text (or in
+Markdown mode, for the note/task editors) and it renders automatically.
+
+| To get this | Type this |
+| --- | --- |
+| **Bold** | `**bold**` |
+| *Italic* | `*italic*` |
+| ~~Strikethrough~~ | `~~strikethrough~~` |
+| A link | `[link text](https://example.com)` |
+| Heading | `# Heading 1`, `## Heading 2`, `### Heading 3` |
+| Blockquote | `> quoted text` |
+| Bulleted list | `- item` |
+| Numbered list | `1. item` |
+| Checklist | `- [ ] not done` and `- [x] done` |
+
+**Checklists** are the one syntax with no toolbar button — type it by hand:
+
+```
+- [ ] Pack the bag
+- [x] Buy tickets
+- [ ] Call the hotel
+```
+
+An unchecked item shows as a `☐` box; a checked one shows as `☑`, struck through. This
+works in the note editor's Markdown mode, and in task notes the same way — a good place
+to keep a small checklist for a task without needing a separate feature for it.
+
+Checklists render as real checkboxes only in the richer editor — that's the
+wide-window daily note, every task's notes field (in either window size), and Focus
+Mode. The compact-page daily memo uses a simpler renderer, so the same syntax there
+shows as a plain list item rather than a checkbox; a task's notes field still renders
+checkboxes correctly even while the window is compact.
+
+Not supported anywhere in Hibimekuri: tables, images, and nested lists. Code blocks
+(fenced with three backticks) render in the compact memo's preview, but aren't
+recognized by the richer note editor.
 
 ## Choosing what the daily quote shows
 
@@ -139,10 +238,13 @@ Every page you've torn off lives in the Archive, most recent first. You can:
 
 ## Themes and appearance
 
-Settings → Appearance lets you pick from six paper themes — Classic, Matcha, Washi,
-Sumi, Zen, and Sakura — each with its own paper color, ink color, accent, and (in the
+Settings → Appearance lets you pick from five paper themes — Classic, Matcha, Washi,
+Zen, and Sakura — each with its own paper color, ink color, accent, and (in the
 wide-window layout) a themed illustration. Independently, you can set Light, Dark, or
 System mode.
+
+The Dock icon follows along too — it shows today's actual date and matches whichever
+theme and light/dark mode is active, updating itself automatically at midnight.
 
 ## Wide-window layout
 
@@ -158,19 +260,30 @@ labels, but weekday names, era names, almanac field names, and section headers. 
 idiom itself always stays in Japanese even in English mode (only its meaning
 translates) — that content is Japanese by nature, not something to replace.
 
-## Your data
+## Your data stays yours
 
-Everything Hibimekuri stores is plain, human-readable JSON on your own Mac — not a
-proprietary format or a database locked inside the app. You can find it via
-**Settings → Reveal in Finder**, and open `entries.json` or `tasks.json` in any text
-editor, with or without Hibimekuri running.
+Hibimekuri treats what you write as yours, not the app's. There's no account to create
+and nothing to sign in to — you can use the entire app, every day, without ever giving
+it your name, your email, or a network connection. Nothing you write is collected,
+analyzed, or sent anywhere. The app doesn't know you exist beyond the files on your own
+disk.
 
-- **Nothing leaves your Mac** unless you turn on iCloud Drive sync yourself (Settings
-  → Sync via iCloud), which shares the same plain files with your other Macs signed
-  into the same iCloud account. There's no hosted service behind this — it's the same
-  mechanism as any other file synced through iCloud Drive.
-- **Export anytime** — Settings → Export Data copies your data to a folder you choose,
-  immediately, as a complete copy.
+That shows up in a few concrete ways:
+
+- **A format you can read without Hibimekuri.** Everything is stored as plain,
+  human-readable JSON — not a proprietary format or a database locked inside the app.
+  You can find it via **Settings → Reveal in Finder**, and open `entries.json` or
+  `tasks.json` in any text editor, with or without Hibimekuri running. If you ever stop
+  using the app, your journal doesn't stop being readable.
+- **100% local by default.** Nothing leaves your Mac unless you turn on iCloud Drive
+  sync yourself (Settings → Sync via iCloud), which shares the same plain files with
+  your other Macs signed into the same iCloud account. There's no hosted service behind
+  this — it's the same mechanism as any other file synced through iCloud Drive, and
+  it's off until you turn it on.
+- **Export anytime** — Settings → Export Data copies your entries and tasks
+  (`entries.json` and `tasks.json`) to a folder you choose, immediately. Custom Quote
+  content isn't included, since it's your own imported file rather than something
+  Hibimekuri generates.
 - **Recovery** — if a data file is ever damaged or unreadable, Hibimekuri backs up the
   original automatically and starts fresh rather than losing everything silently. You'll
   see a message in Settings if this ever happens.
@@ -180,5 +293,10 @@ editor, with or without Hibimekuri running.
 Hibimekuri is built to work with VoiceOver and keyboard navigation: icon-only controls
 have spoken labels, interactive elements that could be operated only by a mouse
 gesture have real button/keyboard equivalents, animations respect Reduce Motion, and
-status indicators (like an overdue task) never rely on color alone. One exception:
-reordering tasks by dragging is currently mouse/trackpad-only.
+status indicators (like an overdue task) never rely on color alone. A collapsed task
+also has a VoiceOver "Show details" action, so opening it doesn't require a
+double-click.
+
+The one keyboard shortcut in the app is **Escape**, to leave Focus Mode. Reordering
+tasks by dragging, and switching between Formatted and Markdown mode, are currently
+mouse/trackpad-only.

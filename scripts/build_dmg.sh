@@ -54,7 +54,7 @@ if [ -d "$RESOURCE_BUNDLE" ]; then
     cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
 fi
 
-# App icon: two variants (Classic Light/Dark, see scripts/generate_app_icon.swift)
+# App icon: two light/dark variants (see scripts/generate_app_icon.swift)
 # copied to the top level of Contents/Resources — CFBundleIconFile below
 # points at the static one Finder/Dock show before launch; AppIconManager
 # swaps the running app's Dock tile to the dark one at runtime.

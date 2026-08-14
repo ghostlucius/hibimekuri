@@ -9,6 +9,7 @@ struct RootView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
     @State private var catchUpRequestID = 0
+    @State private var focusMode = FocusModeController()
 
     /// The app's current page (see `DiaryStore.currentDate()`'s doc
     /// comment) can drift behind the real calendar date if days go by
@@ -41,7 +42,16 @@ struct RootView: View {
         // the window's real right edge, so the plain corner overlay lines
         // up correctly in both compact and extended mode again.
         .overlay(alignment: .topTrailing) { cornerMenu }
+        // On top of the corner icon cluster above, not beside it — Focus
+        // Mode is meant to cover the *whole* window, that cluster included.
+        .overlay {
+            if focusMode.isActive, let journalText = focusMode.journalText {
+                FocusModeView(journalText: journalText, onExit: focusMode.exit)
+            }
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: focusMode.isActive)
         .environment(navigator)
+        .environment(focusMode)
         // Tracks both an explicit Light/Dark choice and, while "System" is
         // selected, live system appearance changes — colorScheme reflects
         // NSApp's effective appearance either way. ThemeManager relies on

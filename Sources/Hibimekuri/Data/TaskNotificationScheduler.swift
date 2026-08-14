@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import OSLog
 
 /// Schedules a single, simple local reminder for a task's deadline —
 /// `TaskItem.deferDate` doubles as the deadline this notifies about (see
@@ -7,8 +8,39 @@ import UserNotifications
 /// notifications only, no APNs/entitlement/paid-account requirement, so
 /// this works fine for an ad-hoc-signed, non-App-Store build.
 enum TaskNotificationScheduler {
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.hibimekuri.app",
+        category: "notifications"
+    )
+
+    /// Checks the existing system decision before requesting permission. The
+    /// completion is always delivered on the main actor so store observers
+    /// can safely reschedule from their MainActor isolation.
     static func requestAuthorization() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            switch settings.authorizationStatus {
+            case .authorized, .provisional, .ephemeral:
+                notifyAuthorizationAvailable()
+            case .notDetermined:
+                center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+                    if let error {
+                        logger.error("Notification authorization failed: \(error.localizedDescription, privacy: .public)")
+                    }
+                    if granted {
+                        notifyAuthorizationAvailable()
+                    }
+                }
+            case .denied:
+                break
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    private static func notifyAuthorizationAvailable() {
+        DispatchQueue.main.async {
             NotificationCenter.default.post(name: .taskNotificationAuthorizationChanged, object: nil)
         }
     }
@@ -26,9 +58,11 @@ enum TaskNotificationScheduler {
     /// system's pending notification queue can be cleared independently of
     /// the app's JSON data.
     static func rescheduleAll(_ tasks: [TaskItem]) {
-        let identifiers = tasks.map { $0.id.uuidString }
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
-        tasks.forEach { reschedule(for: $0) }
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: tasks.map { $0.id.uuidString })
+        scheduleWhenAuthorized(center) {
+            tasks.forEach { schedule($0, with: center) }
+        }
     }
 
     /// Replaces any existing reminder for this task with a fresh one for
@@ -42,7 +76,22 @@ enum TaskNotificationScheduler {
         let identifier = task.id.uuidString
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        scheduleWhenAuthorized(center) {
+            schedule(task, with: center)
+        }
+    }
 
+    private static func scheduleWhenAuthorized(
+        _ center: UNUserNotificationCenter,
+        action: @escaping @Sendable () -> Void
+    ) {
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            action()
+        }
+    }
+
+    private static func schedule(_ task: TaskItem, with center: UNUserNotificationCenter) {
         guard !task.isDone, task.archivedAt == nil, let deferDate = task.deferDate else { return }
 
         guard let fireDate = nextFireDate(for: deferDate) else { return }
@@ -55,7 +104,11 @@ enum TaskNotificationScheduler {
         content.body = task.title
         content.sound = .default
 
-        center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
+        center.add(UNNotificationRequest(identifier: task.id.uuidString, content: content, trigger: trigger)) { error in
+            if let error {
+                logger.error("Couldn't schedule task reminder: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     private static func nextFireDate(for deferDate: Date) -> Date? {

@@ -132,19 +132,22 @@ struct DayPageHeader: View {
             HStack(alignment: .firstTextBaseline) {
                 if language == .japanese {
                     VStack(alignment: .leading, spacing: 2) {
-                        VerticalText(text: day.weekdayLabel(language: .japanese), font: .system(size: 26, weight: .bold))
+                        VerticalText(
+                            text: day.weekdayLabel(language: .japanese),
+                            font: DS.displayFont(size: 26, weight: .bold)
+                        )
                         Text(verbatim: "[\(day.weekdayLabel(language: .english).prefix(3).uppercased())]")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
                 } else {
                     Text(day.weekdayLabel(language: .english))
-                        .font(.system(size: 24, weight: .bold))
+                        .font(DS.displayFont(size: 24, weight: .bold))
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 0) {
                     Text(day.monthLabel(language: language))
-                        .font(.system(size: 26, weight: .bold))
+                        .font(DS.displayFont(size: 26, weight: .bold))
                     Text(verbatim: "(\(Localizer.monthKind(koyomi.monthKind, language: language)))")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
@@ -155,7 +158,7 @@ struct DayPageHeader: View {
 
     private var numeral: some View {
         Text(day.dayNumber)
-            .font(.system(size: 140, weight: .black))
+            .font(DS.displayFont(size: 140, weight: .black))
             .minimumScaleFactor(0.4)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .center)

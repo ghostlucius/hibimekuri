@@ -1,59 +1,75 @@
 import SwiftUI
 
-/// A task's inline notes field: renders as markdown by default, switches to
-/// a raw editable field when tapped, and back to rendered once it loses
-/// focus — the same click-to-edit/lose-focus-to-preview pattern as the
-/// memo/note fields (MemoBox.swift, ExtendedPageView.swift), just without
-/// their box chrome since this sits inline inside a task row. Shared here
-/// rather than duplicated because the compact TaskListView and the
-/// ExtendedTaskRow both use it identically.
+/// Task notes share the main note editor: formatted text is the default,
+/// Markdown remains available when literal syntax is needed, and Focus Mode
+/// edits the same binding without changing task interaction state.
 struct MarkdownNotesField: View {
     @Binding var text: String
     var placeholder: String
 
+    @Environment(FocusModeController.self) private var focusMode
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
-    @State private var isEditing = false
-    @FocusState private var isFocused: Bool
-
-    private var rendered: AttributedString {
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
-    }
+    @State private var noteMode: NoteEditorMode = .formatted
 
     var body: some View {
-        Group {
-            if text.isEmpty || isEditing {
-                TextField(placeholder, text: $text, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .focused($isFocused)
-                    // initial: true matters here — this TextField only
-                    // exists once isEditing is already true (it's the
-                    // conditional branch that creates it), so without
-                    // initial:true this onChange's "first appearance" IS
-                    // that already-true state, and per SwiftUI's documented
-                    // behavior onChange never fires on first appearance by
-                    // default — the focus grab would silently never run,
-                    // leaving a visible-but-unfocused field until a second,
-                    // separate click focused it manually.
-                    .onChange(of: isEditing, initial: true) { _, editing in
-                        isFocused = editing
-                    }
-                    .onChange(of: isFocused) { _, focused in
-                        if !focused { isEditing = false }
-                    }
-            } else {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Spacer()
+
                 Button {
-                    isEditing = true
+                    focusMode.enter(editing: $text)
                 } label: {
-                    Text(rendered)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Localizer.t("メモを編集", "Edit notes", language: language))
+                .help(Localizer.t("集中モード", "Focus Mode", language: language))
+                .accessibilityLabel(Localizer.t("集中モードで開く", "Open in Focus Mode", language: language))
+
+                Button {
+                    noteMode = (noteMode == .formatted) ? .markdown : .formatted
+                } label: {
+                    Image(systemName: noteMode == .formatted ? "textformat" : "doc.richtext")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(noteMode == .formatted
+                    ? Localizer.t("Markdownで編集", "Switch to Markdown", language: language)
+                    : Localizer.t("整形されたテキストで表示", "Switch to formatted text", language: language))
+                .accessibilityLabel(noteMode == .formatted
+                    ? Localizer.t("Markdownで編集", "Switch to Markdown", language: language)
+                    : Localizer.t("整形されたテキストで表示", "Switch to formatted text", language: language))
             }
+
+            ZStack(alignment: .topLeading) {
+                MarkdownRichNoteEditor(
+                    journalText: $text,
+                    mode: noteMode,
+                    themePalette: ThemeManager.shared.currentPalette
+                )
+                .accessibilityLabel(placeholder)
+
+                if text.isEmpty {
+                    // Align the prompt with the editor real first line.
+                    // The former extra vertical padding put its glyphs
+                    // noticeably below the insertion caret.
+                    Text(placeholder)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                        .padding(.leading, 5)
+                        .padding(.top, 2)
+                        .allowsHitTesting(false)
+                }
+            }
+            .frame(minHeight: 96, maxHeight: 180)
+            .padding(5)
+            .overlay(Rectangle().stroke(DS.hairline, lineWidth: 1))
         }
-        .font(.system(size: 12))
-        .foregroundStyle(.secondary)
     }
 }

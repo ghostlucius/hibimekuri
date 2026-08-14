@@ -10,8 +10,8 @@ import SwiftUI
 /// tracking picks up the read through this indirection just like a direct
 /// property access, so the view still re-renders on theme changes.
 enum DS {
-    static let numeralFont = Font.system(size: 180, weight: .black, design: .default)
-    static let smallCaption = Font.system(size: 11, weight: .medium, design: .default)
+    static var numeralFont: Font { displayFont(size: 180, weight: .black) }
+    static var smallCaption: Font { displayFont(size: 11, weight: .medium) }
 
     private static var palette: ThemePalette { ThemeManager.shared.currentPalette }
 
@@ -19,13 +19,23 @@ enum DS {
     static var text: Color { palette.textPrimary }
     static var textSecondary: Color { palette.textSecondary }
     static var hairline: Color { palette.border }
-    // Task rows' own selection highlight — deliberately not using List's
-    // native selection binding at all (see TaskListView.swift), since its
-    // active-state color is raw NSTableView drawing that neither `.tint()`
-    // nor `.listItemTint()` can override on macOS, always showing the
-    // user's system accent color regardless. This is a plain background
-    // color under our own control instead.
-    static var selection: Color { palette.accent.opacity(0.12) }
+
+    /// Typography remains consistent across themes. Sumi changes the paper
+    /// and ink colors only, preserving the app's established type system.
+    static func displayFont(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .default)
+    }
+
+    /// Task selection follows the active theme. Classic is intentionally
+    /// monochrome, so it uses a neutral wash rather than an unrelated color.
+    static var selection: Color {
+        switch ThemeManager.shared.theme {
+        case .classic:
+            return palette.textPrimary.opacity(0.10)
+        case .sumi, .matcha, .washi, .zen, .sakura:
+            return palette.accent.opacity(0.12)
+        }
+    }
 }
 
 /// Renders a short string as stacked single-character lines, mimicking

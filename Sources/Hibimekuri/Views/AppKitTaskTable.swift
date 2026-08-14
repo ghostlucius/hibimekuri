@@ -39,7 +39,8 @@ struct AppKitTaskTable<Item: Identifiable, RowContent: View>: NSViewRepresentabl
         tableView.backgroundColor = .clear
         tableView.selectionHighlightStyle = .none
         tableView.intercellSpacing = NSSize(width: 0, height: 0)
-        tableView.usesAutomaticRowHeights = true
+        tableView.usesAutomaticRowHeights = false
+        tableView.rowHeight = 28
         tableView.rowSizeStyle = .custom
         tableView.style = .plain
         tableView.allowsMultipleSelection = false

@@ -31,10 +31,10 @@ import Foundation
 @MainActor
 enum IllustrationLoader {
     private static var cache: [String: NSImage] = [:]
-    /// Least-recently-used first. Six themes × light/dark = 12 possible
+    /// Least-recently-used first. Five themes × light/dark = 10 possible
     /// variants, but only the current theme's two are ever in play in
     /// practice — this just stops a user clicking through every theme from
-    /// pinning all twelve bitmaps in memory at once.
+    /// pinning all ten bitmaps in memory at once.
     private static var recentlyUsed: [String] = []
     private static let cacheLimit = 3
 

@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage(StorageLocation.iCloudSyncKey) private var iCloudSyncEnabled: Bool = false
     @AppStorage("taskRetentionDays") private var taskRetention: TaskRetention = .thirtyDays
     @State private var showArchivedTasks = false
+    @State private var showEmptyArchivedTasksConfirmation = false
     @State private var exportMessage: String?
 
     private var storageURL: URL {
@@ -139,6 +140,28 @@ struct SettingsView: View {
                                 }
                             }
                             .padding(.top, 2)
+                        }
+
+                        Button(Localizer.t("最近削除した項目を空にする...", "Empty Deleted Tasks...", language: language), role: .destructive) {
+                            showEmptyArchivedTasksConfirmation = true
+                        }
+                        .font(.system(size: 11))
+                        .padding(.top, 4)
+                        .alert(
+                            Localizer.t("最近削除した項目を空にしますか？", "Empty deleted tasks?", language: language),
+                            isPresented: $showEmptyArchivedTasksConfirmation
+                        ) {
+                            Button(Localizer.t("キャンセル", "Cancel", language: language), role: .cancel) {}
+                            Button(Localizer.t("空にする", "Empty", language: language), role: .destructive) {
+                                taskStore.emptyArchivedTasks()
+                                showArchivedTasks = false
+                            }
+                        } message: {
+                            Text(Localizer.t(
+                                "最近削除したタスクは完全に削除され、復元できなくなります。",
+                                "Recently deleted tasks will be permanently removed and cannot be restored.",
+                                language: language
+                            ))
                         }
                     }
                 }
@@ -284,19 +307,13 @@ struct SettingsView: View {
 
     /// Color, not text, is the differentiator between themes, so this uses
     /// a small swatch preview (the theme's own light palette) instead of
-    /// the text-pill style used elsewhere in this screen — six text pills
-    /// ("Classic"/"Matcha"/"Washi"/"Sumi"/"Zen"/"Sakura") wouldn't fit this
+    /// the text-pill style used elsewhere in this screen — five text pills
+    /// ("Classic"/"Matcha"/"Washi"/"Zen"/"Sakura") wouldn't fit this
     /// window's width anyway.
     private func themeSwatchButton(_ option: DiaryTheme) -> some View {
         let palette = option.definition.light
         let isSelected = themeManager.theme == option
-        // Classic's illustration deliberately renders in plain black/white
-        // (its own textPrimary) instead of a colored accent, matching its
-        // "simple black and white" identity — the swatch dot needs the
-        // same exception, or it shows a reddish dot for a theme that
-        // actually renders monochrome, which read as if Classic and
-        // Sumi's colors had been swapped.
-        let dotColor = option == .classic ? palette.textPrimary : palette.accentStrong
+        let dotColor = palette.accentStrong
 
         return Button {
             themeManager.theme = option

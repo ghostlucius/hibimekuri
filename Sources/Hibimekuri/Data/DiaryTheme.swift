@@ -18,15 +18,15 @@ extension Color {
 // MARK: - Theme enum
 
 enum DiaryTheme: String, CaseIterable, Identifiable {
-    case classic, matcha, washi, sumi, zen, sakura
+    case classic, sumi, matcha, washi, zen, sakura
     var id: String { rawValue }
 
     func displayName(language: AppLanguage) -> String {
         switch self {
         case .classic: return Localizer.t("クラシック", "Classic", language: language)
+        case .sumi: return Localizer.t("墨", "Sumi", language: language)
         case .matcha: return Localizer.t("抹茶", "Matcha", language: language)
         case .washi: return Localizer.t("和紙", "Washi", language: language)
-        case .sumi: return Localizer.t("墨", "Sumi", language: language)
         case .zen: return Localizer.t("禅", "Zen", language: language)
         case .sakura: return Localizer.t("桜", "Sakura", language: language)
         }
@@ -58,26 +58,29 @@ struct ThemeDefinition {
 extension DiaryTheme {
     var definition: ThemeDefinition {
         switch self {
-        case .classic:
+        case .sumi:
             return ThemeDefinition(
                 light: ThemePalette(
-                    background: Color(hex: "FAFAF8"),
-                    textPrimary: Color(hex: "2B2B28"),
-                    textSecondary: Color(hex: "6B6A64"),
-                    accent: Color(hex: "8B3A2F"),
-                    accentStrong: Color(hex: "6E2C23"),
-                    border: Color(hex: "D8D6D0")
+                    background: Color(hex: "F7F4EC"),
+                    textPrimary: Color(hex: "171412"),
+                    textSecondary: Color(hex: "625A54"),
+                    accent: Color(hex: "24201D"),
+                    accentStrong: Color(hex: "0B0A09"),
+                    border: Color(hex: "A89F95")
                 ),
                 dark: ThemePalette(
-                    background: Color(hex: "1C1C1A"),
-                    textPrimary: Color(hex: "EDECE8"),
-                    textSecondary: Color(hex: "A6A5A0"),
-                    accent: Color(hex: "C1584A"),
-                    accentStrong: Color(hex: "8B3A2F"),
-                    border: Color(hex: "3A3A37")
+                    background: Color(hex: "171117"),
+                    textPrimary: Color(hex: "F0E7E8"),
+                    textSecondary: Color(hex: "B8A7AE"),
+                    accent: Color(hex: "E8D7DD"),
+                    accentStrong: Color(hex: "F7E9ED"),
+                    border: Color(hex: "5E5058")
                 ),
-                illustrationLight: "fuji-pagoda-classic-light",
-                illustrationDark: "fuji-pagoda-classic-dark"
+                // Sumi deliberately shares Classic's existing hand-drawn
+                // ink illustration. This theme adds only color and type,
+                // leaving the app's visual structure and assets unchanged.
+                illustrationLight: "fuji-pagoda-sumi-light",
+                illustrationDark: "fuji-pagoda-sumi-dark"
             )
 
         case .matcha:
@@ -127,12 +130,9 @@ extension DiaryTheme {
                 illustrationDark: "fuji-pagoda-washi-dark"
             )
 
-        case .sumi:
-            // Pushed to the true black/white extremes — Sumi is "ink," so
-            // it should read starker than Classic's soft warm neutral, not
-            // sit a few shades away from it. Confirmed via testing that
-            // the earlier, closer values made a theme switch to Sumi look
-            // like nothing had changed except the illustration.
+        case .classic:
+            // The neutral default: true black/white extremes, like ink on
+            // paper, rather than a warm or colored variation.
             return ThemeDefinition(
                 light: ThemePalette(
                     background: Color(hex: "FCFCFB"),
@@ -150,15 +150,15 @@ extension DiaryTheme {
                     accentStrong: Color(hex: "FFFFFF"),
                     border: Color(hex: "2A2A27")
                 ),
+                // Resource names retain the original internal Sumi asset
+                // names; the user-facing theme is now Classic.
                 illustrationLight: "fuji-pagoda-sumi-light",
                 illustrationDark: "fuji-pagoda-sumi-dark"
             )
 
         case .zen:
-            // A distinctly cooler, greener gray than Classic's warm
-            // neutral or Sumi's stark black/white — same reasoning as
-            // Sumi above, pushed in the opposite (soft, muted) direction
-            // instead of toward the extremes.
+            // A distinctly cooler, greener gray than Classic's stark
+            // black/white, pushed toward a soft muted green.
             return ThemeDefinition(
                 light: ThemePalette(
                     background: Color(hex: "E5E8E3"),

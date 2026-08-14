@@ -249,7 +249,7 @@ def tasks_settings():
 def themes():
     base = Image.new("RGBA", (1600, 900), BG + (255,))
     draw = ImageDraw.Draw(base)
-    bilingual_heading(draw, (105, 66), "六つの紙の表情", "Six Paper Moods")
+    bilingual_heading(draw, (105, 66), "五つの紙の表情", "Five Paper Moods")
     bilingual_copy(
         draw,
         (108, 178),
@@ -265,10 +265,9 @@ def themes():
     paste_shadowed(base, settings, (1110, 275), radius=18, shadow=20, offset=(0, 10))
 
     swatches = [
-        ("Classic", "クラシック", (244, 244, 241), (43, 43, 40)),
+        ("Classic", "クラシック", (250, 250, 248), (0, 0, 0)),
         ("Matcha", "抹茶", (239, 237, 219), (47, 89, 55)),
         ("Washi", "和紙", (239, 228, 209), (150, 105, 41)),
-        ("Sumi", "墨", (250, 250, 248), (0, 0, 0)),
         ("Zen", "禅", (226, 230, 224), (72, 86, 76)),
         ("Sakura", "桜", (250, 237, 237), ACCENT),
     ]

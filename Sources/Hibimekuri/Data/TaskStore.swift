@@ -22,7 +22,6 @@ final class TaskStore {
         fileURL = dir.appendingPathComponent("tasks.json")
         load()
         purgeExpiredArchivedTasks()
-        TaskNotificationScheduler.rescheduleAll(tasks)
         // A long-running session (app left open across midnight) should
         // still purge on schedule, not only at the next launch — mirrors
         // `AppIconManager`'s identical use of this notification for the
@@ -140,6 +139,17 @@ final class TaskStore {
         TaskNotificationScheduler.reschedule(for: tasks[idx])
     }
 
+    /// Permanently removes every soft-deleted task on explicit user
+    /// confirmation. Active and completed tasks have no archived timestamp
+    /// and are therefore never affected.
+    func emptyArchivedTasks() {
+        let before = tasks.count
+        tasks.removeAll { $0.archivedAt != nil }
+        guard tasks.count != before else { return }
+        scheduleSave()
+        TaskNotificationScheduler.rescheduleAll(tasks)
+    }
+
     /// Permanently removes any archived task older than the configured
     /// retention. Reads the setting directly from `UserDefaults` (like
     /// `AppearanceController.applyStoredPreference()` does) rather than
@@ -183,26 +193,6 @@ final class TaskStore {
                 tasks[idx].order = position
             }
         }
-        scheduleSave()
-    }
-
-    func addChecklistItem(taskId: UUID, title: String) {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let idx = tasks.firstIndex(where: { $0.id == taskId }) else { return }
-        tasks[idx].checklist.append(ChecklistItem(title: trimmed))
-        scheduleSave()
-    }
-
-    func toggleChecklistItem(taskId: UUID, itemId: UUID) {
-        guard let taskIdx = tasks.firstIndex(where: { $0.id == taskId }),
-              let itemIdx = tasks[taskIdx].checklist.firstIndex(where: { $0.id == itemId }) else { return }
-        tasks[taskIdx].checklist[itemIdx].isDone.toggle()
-        scheduleSave()
-    }
-
-    func deleteChecklistItem(taskId: UUID, itemId: UUID) {
-        guard let taskIdx = tasks.firstIndex(where: { $0.id == taskId }) else { return }
-        tasks[taskIdx].checklist.removeAll { $0.id == itemId }
         scheduleSave()
     }
 

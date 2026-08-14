@@ -1,7 +1,7 @@
 #!/usr/bin/env swift
 import AppKit
 
-// Generates the two "Classic" app icon variants (Light/Dark) at every size
+// Generates the two neutral app icon variants (Light/Dark) at every size
 // macOS's .iconset format needs, then packs each into a .icns via iconutil.
 // No Xcode/Icon Composer available in this environment, so this draws the
 // icon directly with AppKit/CoreGraphics instead — a rounded-square paper

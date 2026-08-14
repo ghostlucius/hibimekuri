@@ -37,7 +37,16 @@ struct TodayView: View {
                 }
                 .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.paging)
+            // .paging (not used here) snaps based on the scroll gesture's
+            // own projected travel distance, which is a fraction of page
+            // width — at the extended layout's much wider page (1000pt+
+            // vs. compact's 390pt), the same trackpad swipe covers a much
+            // smaller fraction of the page, so it took far more physical
+            // scrolling to cross the threshold and could stall exactly
+            // halfway. .viewAligned snaps to whichever page edge the
+            // gesture ends closer to instead, so the decision doesn't
+            // scale with page width the same way.
+            .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
             .scrollPosition(id: $scrollPositionID)
             .scrollIndicators(.hidden)
         }

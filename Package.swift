@@ -1,4 +1,4 @@
-// swift-tools-version:5.9
+// swift-tools-version:6.2
 import PackageDescription
 
 let package = Package(
@@ -7,7 +7,12 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Hibimekuri",
-            resources: [.process("Resources")]
+            resources: [.process("Resources")],
+            // The tools-version defaults to the Swift 6 language mode, which turns on
+            // strict concurrency checking — that's a real, separate
+            // codebase-wide migration this change isn't trying to make.
+            // Pinning back to .v5 keeps behavior otherwise unchanged.
+            swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]
 )

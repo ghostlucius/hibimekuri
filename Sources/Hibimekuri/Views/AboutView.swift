@@ -47,6 +47,9 @@ struct AboutView: View {
                 Text(Localizer.t("バージョン \(versionString)", "Version \(versionString)", language: language))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                Text(Localizer.t("作者: Luciano Villani", "by Luciano Villani", language: language))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
             }
 
             VStack(spacing: 8) {
@@ -57,7 +60,7 @@ struct AboutView: View {
                 actionButton(Localizer.t("日めくりとは", "What is a himekuri?", language: language)) {
                     showStory = true
                 }
-                actionButton(Localizer.t("ヘルプ", "Help", language: language)) {
+                actionButton(Localizer.t("ユーザーガイド", "User Guide", language: language)) {
                     NSWorkspace.shared.open(Self.documentationURL)
                 }
                 actionButton(Localizer.t("サポート", "Get support", language: language)) {

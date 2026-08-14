@@ -40,9 +40,12 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
 **The daily page**
 - One page per day — a Japanese idiom or line of literature (with an English meaning
   underneath), a memo field for the day's writing, and a persistent task list.
-- The memo field supports light Markdown — bold, italic, strikethrough, inline code,
-  and links. You write plain text and it renders as soon as you tab away; no separate
-  formatting toolbar to fight with.
+- The memo field supports light Markdown — headers, bulleted/numbered lists,
+  blockquotes, code blocks, bold, italic, strikethrough, inline code, and links. You
+  write plain text and it renders as soon as you tab away; no separate formatting
+  toolbar to fight with.
+- Tapping the date numeral flips it to a full month calendar, with any day that has a
+  task due marked with a red ring. Tap again to flip back.
 - Three quote sources to pick from in Settings: the Japanese idiom, an English word of
   the day, or your own imported quotes — a plain JSON file you provide yourself (see
   [docs/sample-custom-quotes.json](docs/sample-custom-quotes.json) for the format).
@@ -59,12 +62,28 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
   through the backlog and land back on the real calendar date, with a quick tear
   animation for each page passed.
 
+**Writing and Focus Mode**
+- The wide-window layout's NOTE panel, and every task's notes field, share a richer
+  editor than the compact memo: a real WYSIWYG mode (formatting renders live, no
+  Markdown syntax visible) with a floating toolbar for headers, bold, italic, links,
+  blockquotes, and lists — or a raw Markdown source mode for typing syntax directly, one
+  click apart via a toggle icon.
+- Real GitHub-style checklists: type `- [ ]` / `- [x]` in Markdown mode and they render
+  as ☐/☑ checkboxes, with checked items struck through. See the [User Guide's Markdown
+  guide](docs/USER_GUIDE.md#writing-in-markdown) for the full syntax reference.
+- **Focus Mode** turns either editor into a full-window, distraction-free writing view
+  — one click to enter, Escape or the same icon to exit — for when you want to write
+  without the rest of the page around you.
+
 **Tasks**
 - A persistent to-do list, separate from any single day — carries forward on its own.
-- Checklists, per-task notes, drag-to-reorder, and a "do later" defer date that keeps
-  tasks off the main list until they're relevant.
-- Deleting a task archives it instead of destroying it — configurable retention (15 /
-  30 / 90 days) with a "Recently deleted" restore list in Settings.
+- Single click selects a task; double-click expands it to edit its notes and set a
+  "do later" defer date. Drag to reorder within the active or done group.
+- A "do later" defer date keeps a task off the main list until that date arrives, and
+  doubles as its deadline — see reminders below.
+- Deleting a task archives it instead of destroying it right away — configurable
+  retention (15 / 30 / 90 days) with a "Recently deleted" restore list in Settings, plus
+  a manual "Empty Deleted Tasks…" option if you want it gone immediately.
 - Optional local reminder for tasks with a deadline: a single, simple notification the
   morning something is due. Local-only, no account or server involved.
 
@@ -73,11 +92,15 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
 - Read-only aside from Restore, by design.
 
 **Look and feel**
-- Six named themes (Classic, Matcha, Washi, Sumi, Zen, Sakura), each with its own paper
+- Five named themes (Classic, Matcha, Washi, Zen, Sakura), each with its own paper
   color, accent, and a themed illustration — plus Light/Dark/System modes.
 - A real two-pane wide-window layout for larger screens, not just a stretched version of
   the compact page.
 - Native macOS fullscreen support.
+- The Dock icon shows today's actual date and redraws itself at midnight, matching
+  whichever theme and light/dark mode is active.
+- A short first-launch introduction to what a himekuri is — reachable again anytime from
+  the About panel's "What is a himekuri?" button.
 
 **Language**
 - Full Japanese/English UI toggle — weekdays, era, almanac labels, section headers, all
@@ -94,8 +117,8 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
   ever leaves your Mac unless you turn on iCloud Drive sync yourself.
 - Optional iCloud Drive sync between your own Macs (not a hosted service — just the
   same files shared via your iCloud Drive).
-- One-click manual export to a folder of your choosing, any time — an immediate,
-  complete copy of your data, not a request you wait on.
+- One-click manual export to a folder of your choosing, any time — an immediate copy of
+  your entries and tasks, not a request you wait on.
 - Automatic crash-safe saving: debounced writes, a save flush on quit, and automatic
   backup-and-recovery if a data file ever turns out to be unreadable.
 
@@ -130,8 +153,8 @@ app → **Open**, confirm once, and it'll launch normally every time after. Alte
 after a blocked launch attempt, go to **System Settings → Privacy & Security** and
 click **Open Anyway** next to the app warning.
 
-Requires macOS 14 or later. Universal binary — runs natively on both Apple Silicon and
-Intel Macs.
+Requires macOS 14 or later. Universal binary — runs natively on both Apple Silicon
+and Intel Macs.
 
 ## Building from source
 
@@ -155,9 +178,9 @@ notes there) — use the packaged `.app` for anything beyond a quick compile che
 ## Documentation
 
 See the [User Guide](docs/USER_GUIDE.md) for a walkthrough of every feature — the
-daily page, the almanac fields, tasks, Custom Quote, themes, and how your data is
-stored. It's also linked from the app itself: Hibimekuri menu → About Hibimekuri →
-Help.
+daily page, the almanac fields, tasks, Focus Mode, Markdown formatting, Custom Quote,
+themes, and how your data is stored. It's also linked from the app itself: Hibimekuri
+menu → About Hibimekuri → User Guide.
 
 ## Status
 

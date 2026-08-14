@@ -21,15 +21,8 @@ struct ExtendedPageView: View {
     var onJumpToToday: (() -> Void)? = nil
 
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
-    @State private var isEditingNote = false
-    @FocusState private var noteFocused: Bool
-
-    /// Full block Markdown (headings, lists, blockquotes, code — see
-    /// BlockMarkdownRenderer) rather than MemoBox's inline-only rendering:
-    /// this pane has the room for it, the compact memo doesn't.
-    private var renderedNote: AttributedString {
-        BlockMarkdownRenderer.render(entry.journalText)
-    }
+    @Environment(FocusModeController.self) private var focusMode
+    @State private var noteMode: NoteEditorMode = .formatted
 
     /// The calendar side stays fixed — literally the same `DayPageHeader`
     /// component the compact page uses, at the same width, unchanged as
@@ -40,7 +33,7 @@ struct ExtendedPageView: View {
     /// the same") — reusing the real component instead of reimplementing
     /// it sidesteps that class of mistake entirely.
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .top, spacing: 0) {
             leftPane
                 .frame(width: 400)
             HairlineDivider()
@@ -98,40 +91,30 @@ struct ExtendedPageView: View {
     // MARK: - Right pane
 
     private var rightPane: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            taskSection
-            HairlineDivider()
-            noteSection
-            tearButton
+        GeometryReader { proxy in
+            VStack(alignment: .leading, spacing: 24) {
+                taskSection(maxListHeight: taskListMaxHeight(for: proxy.size.height))
+                HairlineDivider()
+                noteSection
+                tearButton
+            }
+            .padding(32)
+            .padding(.top, 20)
+            .frame(maxWidth: 760, maxHeight: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .padding(32)
-        // Extra top clearance: the corner icon cluster (Today/Archive)
-        // floats over the window's actual top-right corner, which sits
-        // inside this pane's top edge.
-        .padding(.top, 20)
-        // Caps the reading/editing column at a sane width even though the
-        // pane itself is 80% of a wide window — otherwise task rows and the
-        // note just stretch edge to edge with a huge gap between the title
-        // and the trailing icons, which looks broken, not spacious.
-        //
-        // Both constraints belong in one `frame` call, not two chained
-        // ones — chaining `.frame(maxWidth: 760)` and then
-        // `.frame(maxHeight: .infinity)` on separate calls only let the
-        // *outer* frame report a flexible height up to its own parent; it
-        // never fed that extra height back down into the VStack, so the
-        // VStack (and everything in it, including the note box below) just
-        // sized to its own intrinsic content height and got top-aligned
-        // inside the leftover space — which is exactly the dead space
-        // below "TEAR OFF TODAY" on a tall window. Setting both in a
-        // single call proposes the full available height to the VStack
-        // itself, so its one flexible child (the note box, see noteSection
-        // below) can actually grow into it.
-        .frame(maxWidth: 760, maxHeight: .infinity, alignment: .top)
-        .frame(maxWidth: .infinity, alignment: .top)
     }
 
-    private var taskSection: some View {
-        ExtendedTaskSection(language: language)
+    /// Leaves the calendar and main note their guaranteed room first. The
+    /// task list can grow within this allocation and then scrolls on its
+    /// own, instead of extending the entire two-pane page beyond the window.
+    private func taskListMaxHeight(for availableHeight: CGFloat) -> CGFloat {
+        let reservedHeight: CGFloat = 465
+        return min(360, max(120, availableHeight - reservedHeight))
+    }
+
+    private func taskSection(maxListHeight: CGFloat) -> some View {
+        ExtendedTaskSection(language: language, maxListHeight: maxListHeight)
     }
 
     private var noteSection: some View {
@@ -142,76 +125,42 @@ struct ExtendedPageView: View {
                     .foregroundStyle(.secondary)
                     .tracking(1.2)
                 Spacer()
-                Menu {
-                    Button(Localizer.t("メモを消去", "Clear note", language: language), role: .destructive) {
-                        entry.journalText = ""
-                    }
+                Button {
+                    focusMode.enter(editing: $entry.journalText)
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 13))
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .frame(width: 20, height: 20)
                         .contentShape(Rectangle())
                 }
-                .menuStyle(.borderlessButton)
-                // SwiftUI draws its own disclosure arrow next to any custom
-                // Menu label by default (Menu.menuIndicator(.visible), the
-                // default) — that's what was showing up glued onto the
-                // ellipsis icon. This is the only supported way to turn it
-                // off; the icon alone already reads as "more options".
-                .menuIndicator(.hidden)
-                .help(Localizer.t("その他のオプション", "More options", language: language))
-                .accessibilityLabel(Localizer.t("その他のオプション", "More options", language: language))
+                .buttonStyle(.plain)
+                .help(Localizer.t("集中モード", "Focus Mode", language: language))
+                .accessibilityLabel(Localizer.t("集中モードで開く", "Open in Focus Mode", language: language))
+
+                Button {
+                    noteMode = (noteMode == .formatted) ? .markdown : .formatted
+                } label: {
+                    // Reflects the mode you'd switch *to*, matching how a
+                    // toggle control's icon usually reads — showing "M↓"
+                    // while already in Markdown mode would just repeat
+                    // what's already on screen.
+                    Image(systemName: noteMode == .formatted ? "textformat" : "doc.richtext")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(noteMode == .formatted
+                    ? Localizer.t("Markdownで編集", "Switch to Markdown", language: language)
+                    : Localizer.t("整形されたテキストで表示", "Switch to formatted text", language: language))
+                .accessibilityLabel(noteMode == .formatted
+                    ? Localizer.t("Markdownで編集", "Switch to Markdown", language: language)
+                    : Localizer.t("整形されたテキストで表示", "Switch to formatted text", language: language))
             }
 
-            Group {
-                if entry.journalText.isEmpty || isEditingNote {
-                    TextEditor(text: $entry.journalText)
-                        .font(.system(size: 12, design: .monospaced))
-                        .scrollContentBackground(.hidden)
-                        .focused($noteFocused)
-                        .accessibilityLabel(Localizer.t("メモ", "Note", language: language))
-                        // Only grabs focus when isEditingNote flips true
-                        // (tapping the rendered preview below) — never on
-                        // mere appearance, which stole keystrokes typed
-                        // anywhere else in the app the instant an empty
-                        // note scrolled into view. initial: true is still
-                        // needed: this TextEditor is a brand-new view the
-                        // moment isEditingNote becomes true (that's what
-                        // creates it), so without initial:true this
-                        // onChange's first evaluation IS that already-true
-                        // state, and onChange never fires on first
-                        // appearance by default — the focus grab silently
-                        // never ran, requiring a second click to focus the
-                        // now-visible editor manually.
-                        .onChange(of: isEditingNote, initial: true) { _, editing in
-                            noteFocused = editing
-                        }
-                        .onChange(of: noteFocused) { _, focused in
-                            // Mirrors both ways — see MemoBox.swift's identical
-                            // fix for why focus-lost-only wasn't enough: an
-                            // empty note shows this editor from `isEmpty`
-                            // alone, so the first keystroke that makes it
-                            // non-empty was collapsing the editor back to the
-                            // preview (isEditingNote was never actually set)
-                            // and dropping focus mid-keystroke.
-                            isEditingNote = focused
-                        }
-                } else {
-                    Button {
-                        isEditingNote = true
-                    } label: {
-                        ScrollView {
-                            Text(renderedNote)
-                                .font(.system(size: 12, design: .monospaced))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Localizer.t("メモを編集", "Edit note", language: language))
-                }
-            }
+            MarkdownRichNoteEditor(journalText: $entry.journalText, mode: noteMode, themePalette: ThemeManager.shared.currentPalette)
             .padding(6)
             // Was a fixed 220pt regardless of window height — the one
             // deliberately flexible element in the pane now, so a tall
@@ -297,6 +246,7 @@ struct ExtendedPageView: View {
 /// SwiftUI's own `List`/`.draggable`.
 private struct ExtendedTaskSection: View {
     let language: AppLanguage
+    let maxListHeight: CGFloat
 
     @Environment(TaskStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -321,69 +271,101 @@ private struct ExtendedTaskSection: View {
 
     /// See TaskListView.swift's identical helper for the full rationale.
     private func estimatedHeight(for group: [TaskItem], expanded: UUID?) -> CGFloat {
-        let collapsedRowHeight: CGFloat = 34
+        let collapsedRowHeight: CGFloat = 28
         let expandedExtra: CGFloat = 180
         let hasExpanded = expanded.map { id in group.contains { $0.id == id } } ?? false
         return CGFloat(group.count) * collapsedRowHeight + (hasExpanded ? expandedExtra : 0)
     }
 
+    private var taskListContentHeight: CGFloat {
+        var height: CGFloat = 28
+        if !activeTasks.isEmpty { height += estimatedHeight(for: activeTasks, expanded: expandedTaskID) + 10 }
+        if !doneTasks.isEmpty { height += estimatedHeight(for: doneTasks, expanded: expandedTaskID) + 10 }
+        if !deferredTasks.isEmpty {
+            height += 20
+            if showDeferred { height += CGFloat(deferredTasks.count) * 34 + 10 }
+        }
+        return height
+    }
+
+    /// The viewport is based on collapsed rows only. Opening a task must
+    /// never make the task panel grow and push the rest of the page away.
+    private var collapsedTaskListContentHeight: CGFloat {
+        var height: CGFloat = 28
+        if !activeTasks.isEmpty { height += estimatedHeight(for: activeTasks, expanded: nil) + 10 }
+        if !doneTasks.isEmpty { height += estimatedHeight(for: doneTasks, expanded: nil) + 10 }
+        if !deferredTasks.isEmpty { height += 20 }
+        return height
+    }
+
+    private var taskListViewportHeight: CGFloat {
+        min(maxListHeight, max(160, collapsedTaskListContentHeight))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(Localizer.t("やること", "TASKS", language: language))
-                    .font(DS.smallCaption)
-                    .foregroundStyle(.secondary)
-                    .tracking(1.2)
-                Spacer()
-                Button { fieldFocused = true } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .bold))
-                        .frame(width: 20, height: 20)
-                        .contentShape(Rectangle())
-                        .overlay(Circle().stroke(DS.text.opacity(0.5), lineWidth: 1))
+            Text(Localizer.t("やること", "TASKS", language: language))
+                .font(DS.smallCaption)
+                .foregroundStyle(.secondary)
+                .tracking(1.2)
+
+            ScrollView(.vertical, showsIndicators: taskListContentHeight > taskListViewportHeight) {
+                VStack(alignment: .leading, spacing: 10) {
+                    if !activeTasks.isEmpty {
+                        if expandedTaskID == nil {
+                            AppKitTaskTable(items: activeTasks, taskStore: store, onReorder: { reordered in
+                                store.reorder(reordered)
+                            }) { task in row(task) }
+                                .frame(height: estimatedHeight(for: activeTasks, expanded: nil))
+                        } else {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(activeTasks) { task in row(task) }
+                            }
+                        }
+                    }
+                    if !doneTasks.isEmpty {
+                        if expandedTaskID == nil {
+                            AppKitTaskTable(items: doneTasks, taskStore: store, onReorder: { reordered in
+                                store.reorder(reordered)
+                            }) { task in row(task) }
+                                .frame(height: estimatedHeight(for: doneTasks, expanded: nil))
+                        } else {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(doneTasks) { task in row(task) }
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        TextField(Localizer.t("タスクを追加", "Add a task", language: language), text: $newTaskText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13))
+                            .focused($fieldFocused)
+                            .onSubmit(addTask)
+                    }
+
+                    if !deferredTasks.isEmpty {
+                        Button {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { showDeferred.toggle() }
+                        } label: {
+                            Text(Localizer.t("＋\(deferredTasks.count)件 予定あり", "+\(deferredTasks.count) scheduled", language: language))
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+
+                        if showDeferred {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(deferredTasks) { task in row(task) }
+                            }
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Localizer.t("タスクを追加", "Add a task", language: language))
             }
-
-            if !activeTasks.isEmpty {
-                AppKitTaskTable(items: activeTasks, taskStore: store, onReorder: { reordered in
-                    store.reorder(reordered)
-                }) { task in row(task) }
-                    .frame(height: estimatedHeight(for: activeTasks, expanded: expandedTaskID))
-            }
-            if !doneTasks.isEmpty {
-                AppKitTaskTable(items: doneTasks, taskStore: store, onReorder: { reordered in
-                    store.reorder(reordered)
-                }) { task in row(task) }
-                    .frame(height: estimatedHeight(for: doneTasks, expanded: expandedTaskID))
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                TextField(Localizer.t("タスクを追加", "Add a task", language: language), text: $newTaskText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .focused($fieldFocused)
-                    .onSubmit(addTask)
-            }
-
-            if !deferredTasks.isEmpty {
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { showDeferred.toggle() }
-                } label: {
-                    Text(Localizer.t("＋\(deferredTasks.count)件 予定あり", "+\(deferredTasks.count) scheduled", language: language))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-
-                if showDeferred {
-                    ForEach(deferredTasks) { task in row(task) }
-                }
-            }
+            .frame(height: taskListViewportHeight)
         }
         // Things-style "click anywhere else closes/deselects it" — see
         // TaskListView.swift's identical use of this notification for the
@@ -391,6 +373,14 @@ private struct ExtendedTaskSection: View {
         .onReceive(NotificationCenter.default.publisher(for: .taskInteractionReset)) { _ in
             selectedTaskID = nil
             expandedTaskID = nil
+        }
+        // The dismissal target belongs only to the task section, never the
+        // rest of the extended page. Its background placement leaves task
+        // controls and the Markdown editor fully interactive.
+        .background {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { closeExpandedTask() }
         }
     }
 
@@ -400,8 +390,22 @@ private struct ExtendedTaskSection: View {
             language: language,
             isExpanded: expandedTaskID == task.id,
             isSelected: selectedTaskID == task.id,
-            onOpen: { expandedTaskID = task.id },
-            onSelect: { selectedTaskID = task.id }
+            onOpen: {
+                if expandedTaskID == task.id {
+                    expandedTaskID = nil
+                } else {
+                    selectedTaskID = task.id
+                    expandedTaskID = task.id
+                }
+            },
+            onSelect: {
+                if expandedTaskID == task.id {
+                    closeExpandedTask()
+                } else {
+                    selectedTaskID = task.id
+                    expandedTaskID = nil
+                }
+            }
         )
     }
 
@@ -409,6 +413,11 @@ private struct ExtendedTaskSection: View {
         store.add(title: newTaskText)
         newTaskText = ""
         fieldFocused = true
+    }
+
+    private func closeExpandedTask() {
+        selectedTaskID = nil
+        expandedTaskID = nil
     }
 }
 
@@ -422,11 +431,8 @@ private struct ExtendedTaskRow: View {
 
     @Environment(TaskStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var newStepText = ""
     @State private var showDatePicker = false
     @State private var pendingDeferDate = Date()
-    @State private var isEditingTitle = false
-    @FocusState private var stepFieldFocused: Bool
     @FocusState private var titleFocused: Bool
 
     private var titleBinding: Binding<String> {
@@ -465,11 +471,8 @@ private struct ExtendedTaskRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // One line, not two — the badge/checklist-count used to sit on
-            // their own right-aligned row below the title, which is why
-            // "Overdue" never lined up with the task the way it does in
-            // the compact layout even though extended mode has more room,
-            // not less. Same single-line shape as the compact TaskRow now.
+            // A single row keeps the due-date state aligned with its task in
+            // both compact and extended layouts.
             HStack(spacing: 8) {
                 Button {
                     withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.12)) { store.toggleDone(task.id) }
@@ -494,11 +497,6 @@ private struct ExtendedTaskRow: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(badge.isOverdue ? Color.red : DS.textSecondary)
                 }
-                if !task.checklist.isEmpty {
-                    Text(verbatim: "\(task.checklist.filter { $0.isDone }.count)/\(task.checklist.count)")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                }
 
                 Button { store.delete(task.id) } label: {
                     Image(systemName: "xmark")
@@ -515,13 +513,10 @@ private struct ExtendedTaskRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(isSelected ? DS.selection : Color.clear)
             .contentShape(Rectangle())
-            // Double-click always opens (never toggles closed) — closing
-            // only happens by clicking elsewhere (see taskInteractionReset).
             .onTapGesture(count: 2) {
-                startRename()
+                onOpen()
             }
             .onTapGesture(count: 1) {
-                guard !isEditingTitle else { return }
                 onSelect()
             }
             // Dragging is handled entirely by the enclosing
@@ -533,48 +528,6 @@ private struct ExtendedTaskRow: View {
 
                     deferRow
 
-                    ForEach(task.checklist) { item in
-                        HStack(spacing: 6) {
-                            Button {
-                                store.toggleChecklistItem(taskId: task.id, itemId: item.id)
-                            } label: {
-                                Image(systemName: item.isDone ? "checkmark.square" : "square")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(item.isDone ? DS.text : DS.textSecondary)
-                                    .frame(width: 20, height: 20)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(item.isDone
-                                ? Localizer.t("ステップを未完了にする", "Mark step incomplete", language: language)
-                                : Localizer.t("ステップを完了", "Complete step", language: language))
-                            Text(item.title)
-                                .font(.system(size: 12))
-                                .strikethrough(item.isDone)
-                            Spacer()
-                            Button { store.deleteChecklistItem(taskId: task.id, itemId: item.id) } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 9))
-                                    .frame(width: 20, height: 20)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Localizer.t("ステップを削除", "Delete step", language: language))
-                        }
-                    }
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus").font(.system(size: 9, weight: .semibold)).foregroundStyle(.tertiary)
-                        TextField(Localizer.t("ステップを追加", "Add a step", language: language), text: $newStepText)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12))
-                            .focused($stepFieldFocused)
-                            .onSubmit {
-                                store.addChecklistItem(taskId: task.id, title: newStepText)
-                                newStepText = ""
-                                stepFieldFocused = true
-                            }
-                    }
                 }
                 .padding(.leading, 22)
             }
@@ -643,20 +596,13 @@ private struct ExtendedTaskRow: View {
                 .accessibilityAction(named: Localizer.t("詳細を表示", "Show details", language: language)) {
                     onOpen()
                 }
-            } else if isEditingTitle {
+            } else if isExpanded {
                 TextField("", text: titleBinding)
                     .textFieldStyle(.plain)
                     .focused($titleFocused)
                     .accessibilityLabel(Localizer.t("タスク名", "Task title", language: language))
-                    .onChange(of: isEditingTitle, initial: true) { _, editing in
-                        if editing {
-                            DispatchQueue.main.async { titleFocused = true }
-                        } else {
-                            titleFocused = false
-                        }
-                    }
-                    .onChange(of: titleFocused) { _, focused in
-                        if !focused { isEditingTitle = false }
+                    .onAppear {
+                        DispatchQueue.main.async { titleFocused = true }
                     }
             } else {
                 Text(task.title)
@@ -665,23 +611,8 @@ private struct ExtendedTaskRow: View {
                 .accessibilityAction(named: Localizer.t("詳細を表示", "Show details", language: language)) {
                     onOpen()
                 }
-                .accessibilityAction(named: Localizer.t("名前を変更", "Rename task", language: language)) {
-                    startRename()
-                }
             }
         }
         .font(.system(size: 13))
-        .onChange(of: isExpanded) { _, expanded in
-            if !expanded {
-                isEditingTitle = false
-            }
-        }
-    }
-
-    private func startRename() {
-        onOpen()
-        if !task.isDone {
-            isEditingTitle = true
-        }
     }
 }
