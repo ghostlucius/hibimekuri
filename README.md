@@ -40,10 +40,8 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
 **The daily page**
 - One page per day — a Japanese idiom or line of literature (with an English meaning
   underneath), a memo field for the day's writing, and a persistent task list.
-- The memo field supports light Markdown — headers, bulleted/numbered lists,
-  blockquotes, code blocks, bold, italic, strikethrough, inline code, and links. You
-  write plain text and it renders as soon as you tab away; no separate formatting
-  toolbar to fight with.
+- The memo field is a full Markdown editor — see "Writing and Focus Mode" below for
+  what it can do.
 - Tapping the date numeral flips it to a full month calendar, with any day that has a
   task due marked with a red ring. Tap again to flip back.
 - Three quote sources to pick from in Settings: the Japanese idiom, an English word of
@@ -63,14 +61,18 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
   animation for each page passed.
 
 **Writing and Focus Mode**
-- The wide-window layout's NOTE panel, and every task's notes field, share a richer
-  editor than the compact memo: a real WYSIWYG mode (formatting renders live, no
-  Markdown syntax visible) with a floating toolbar for headers, bold, italic, links,
-  blockquotes, and lists — or a raw Markdown source mode for typing syntax directly, one
-  click apart via a toggle icon.
-- Real GitHub-style checklists: type `- [ ]` / `- [x]` in Markdown mode and they render
-  as ☐/☑ checkboxes, with checked items struck through. See the [User Guide's Markdown
-  guide](docs/USER_GUIDE.md#writing-in-markdown) for the full syntax reference.
+- The daily memo, the wide-window layout's NOTE panel, and every task's notes field all
+  share the same rich editor: a real WYSIWYG mode (formatting renders live, no Markdown
+  syntax visible) with a floating toolbar for headers, bold, italic, links, blockquotes,
+  lists, checklists, and code blocks — or a raw Markdown source mode for typing syntax
+  directly, one click apart via a toggle icon.
+- Typing complete Markdown syntax (`# `, `- `, `- [ ] `, and so on) directly into
+  formatted mode converts it live to the styled equivalent — the same result as pressing
+  the matching toolbar button.
+- Real GitHub-style checklists: use the toolbar button, or type `- [ ]` / `- [x]` in
+  Markdown mode — either way they render as ☐/☑ checkboxes, with checked items struck
+  through. See the [User Guide's Markdown guide](docs/USER_GUIDE.md#writing-in-markdown)
+  for the full syntax reference.
 - **Focus Mode** turns either editor into a full-window, distraction-free writing view
   — one click to enter, Escape or the same icon to exit — for when you want to write
   without the rest of the page around you.
@@ -92,7 +94,7 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
 - Read-only aside from Restore, by design.
 
 **Look and feel**
-- Five named themes (Classic, Matcha, Washi, Zen, Sakura), each with its own paper
+- Six named themes (Classic, Sumi, Matcha, Washi, Zen, Sakura), each with its own paper
   color, accent, and a themed illustration — plus Light/Dark/System modes.
 - A real two-pane wide-window layout for larger screens, not just a stretched version of
   the compact page.

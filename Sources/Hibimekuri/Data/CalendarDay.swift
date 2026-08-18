@@ -62,18 +62,10 @@ struct CalendarDay {
         return labels
     }
 
-    var daysInMonth: Int {
-        Calendar.current.range(of: .day, in: .month, for: date)?.count ?? 30
-    }
-
     func fullDateLabel(language: AppLanguage) -> String {
         if language == .english {
             return Self.englishFullDateFormatter.string(from: date)
         }
         return Self.japaneseFullDateFormatter.string(from: date)
-    }
-
-    var isToday: Bool {
-        Calendar.current.isDateInToday(date)
     }
 }

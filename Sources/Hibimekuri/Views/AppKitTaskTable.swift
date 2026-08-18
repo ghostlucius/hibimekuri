@@ -309,5 +309,5 @@ private final class PlainRowView: NSTableRowView {
 }
 
 private extension NSPasteboard.PasteboardType {
-    static let taskRowPasteboardType = NSPasteboard.PasteboardType("com.himekuri.taskrow")
+    static let taskRowPasteboardType = NSPasteboard.PasteboardType("com.hibimekuri.taskrow")
 }

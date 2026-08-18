@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Hosts both note editors — formatted (WYSIWYG, `RichNoteEditor`) and raw
 /// Markdown (`PlainMarkdownEditor`, plain text) — mounted conditionally,
@@ -58,11 +59,17 @@ struct MarkdownRichNoteEditor: View {
     @State private var hasLoaded = false
     @State private var isEditingFormatted = false
     @State private var isEditingMarkdown = false
+    @State private var formattedEditorID = UUID()
 
     var body: some View {
         Group {
             if mode == .formatted {
                 RichNoteEditor(text: $formattedText, themePalette: themePalette)
+                    // A source-mode edit may have updated just before this
+                    // AppKit editor remounts. A fresh identity guarantees it
+                    // receives the newly parsed document rather than a stale
+                    // native text storage snapshot.
+                    .id(formattedEditorID)
             } else {
                 PlainMarkdownEditor(text: $journalText)
             }
@@ -88,18 +95,96 @@ struct MarkdownRichNoteEditor: View {
             formattedText = reparsed
             DispatchQueue.main.async { isEditingMarkdown = false }
         }
+        // Raw Markdown can arrive as one paste immediately before the mode
+        // button is pressed. The mode boundary itself owns the final sync:
+        // serialize the live visual document before exposing source, then
+        // reparse that exact source when returning to formatted mode.
+        .onChange(of: mode) { _, newMode in
+            if newMode == .markdown {
+                let serialized = NoteMarkdown.serialize(formattedText)
+                guard serialized != journalText else { return }
+                isEditingFormatted = true
+                journalText = serialized
+                DispatchQueue.main.async { isEditingFormatted = false }
+                return
+            }
+            // Defer one turn so a just-finished paste has committed its
+            // binding before parsing the source into the AppKit editor.
+            DispatchQueue.main.async {
+                guard mode == .formatted else { return }
+                isEditingMarkdown = true
+                formattedText = NoteMarkdown.parse(journalText)
+                formattedEditorID = UUID()
+                DispatchQueue.main.async { isEditingMarkdown = false }
+            }
+        }
     }
 }
 
-/// Markdown mode deliberately uses a plain `String` editor so literal source
-/// text stays literal, including list and task-list markers.
-private struct PlainMarkdownEditor: View {
+/// Markdown mode must stay a literal source editor. SwiftUI's `TextEditor`
+/// allows macOS to auto-transform list prefixes before its binding receives
+/// them, so use a plain AppKit text view with every rich-text substitution
+/// disabled instead.
+private struct PlainMarkdownEditor: NSViewRepresentable {
     @Binding var text: String
 
-    var body: some View {
-        TextEditor(text: $text)
-            .font(.system(size: 12, design: .monospaced))
-            .scrollContentBackground(.hidden)
-            .autocorrectionDisabled()
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+
+        let textView = NSTextView()
+        textView.delegate = context.coordinator
+        textView.string = text
+        textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        textView.drawsBackground = false
+        textView.isRichText = false
+        textView.importsGraphics = false
+        textView.allowsUndo = true
+        textView.usesRuler = false
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.isAutomaticTextCompletionEnabled = false
+        textView.isAutomaticLinkDetectionEnabled = false
+        textView.isAutomaticDataDetectionEnabled = false
+        textView.textContainerInset = NSSize(width: 0, height: 2)
+        textView.minSize = .zero
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
+
+        scrollView.documentView = textView
+        context.coordinator.textView = textView
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        guard !context.coordinator.isUpdating, let textView = context.coordinator.textView,
+              textView.string != text else { return }
+        context.coordinator.isUpdating = true
+        textView.string = text
+        context.coordinator.isUpdating = false
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: PlainMarkdownEditor
+        weak var textView: NSTextView?
+        var isUpdating = false
+
+        init(parent: PlainMarkdownEditor) {
+            self.parent = parent
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard !isUpdating, let textView else { return }
+            parent.text = textView.string
+        }
     }
 }

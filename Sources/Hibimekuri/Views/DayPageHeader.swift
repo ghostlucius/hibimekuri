@@ -15,8 +15,20 @@ struct DayPageHeader: View {
     @State private var showMonthFlip = false
     @State private var flipDegrees: Double = 0
 
+    // Computed once per view instance rather than per read — `koyomi` used
+    // to be a computed property re-running Koyomi.day(for:)'s full
+    // astronomical calculation (iterative solar-longitude correction, a
+    // new-moon search loop) on every one of its 8 read sites across
+    // topRow/leftColumn/rightColumn, all within the same render pass.
+    private let koyomi: Koyomi.Day
+
+    init(date: Date, language: AppLanguage = .japanese) {
+        self.date = date
+        self.language = language
+        self.koyomi = Koyomi.day(for: date)
+    }
+
     private var day: CalendarDay { CalendarDay(date: date) }
-    private var koyomi: Koyomi.Day { Koyomi.day(for: date) }
 
     /// Days carrying a task due date, normalized to midnight — used to dot
     /// the mini calendars and the flip calendar alike.
