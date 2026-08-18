@@ -74,6 +74,11 @@ private struct AppKitRichTextEditor: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.typingAttributes = [
+            Self.blockStyleAttribute: NoteBlockStyle.body.rawValue,
+            .font: NSFont.systemFont(ofSize: 12),
+            .foregroundColor: NSColor(palette.textPrimary)
+        ]
         textView.textContainerInset = NSSize(width: 0, height: 2)
         textView.minSize = .zero
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -98,6 +103,7 @@ private struct AppKitRichTextEditor: NSViewRepresentable {
         var parent: AppKitRichTextEditor
         weak var textView: NSTextView?
         private var isRendering = false
+        private var isApplyingMarkdownShortcut = false
 
         init(parent: AppKitRichTextEditor) {
             self.parent = parent
@@ -123,8 +129,97 @@ private struct AppKitRichTextEditor: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard !isRendering, let textView else { return }
+            if !isApplyingMarkdownShortcut {
+                applyMarkdownShortcutIfNeeded(in: textView)
+            }
             parent.text = NoteMarkdown.attributedString(from: textView.attributedString())
             parent.selection = textView.selectedRange()
+        }
+
+        /// Formatted mode is still Markdown-aware: typing a complete block
+        /// marker directly into it creates the same result as the toolbar.
+        /// Raw source mode remains available for literal Markdown editing.
+        private func applyMarkdownShortcutIfNeeded(in textView: NSTextView) {
+            guard let storage = textView.textStorage else { return }
+            let source = storage.string as NSString
+            guard source.length > 0 else { return }
+
+            let selection = textView.selectedRange()
+            var candidates: [NSRange] = []
+            var location = 0
+            while location < source.length {
+                let lineRange = source.lineRange(for: NSRange(location: location, length: 0))
+                let contentLength = lineRange.length - (source.substring(with: lineRange).hasSuffix("\n") ? 1 : 0)
+                let contentRange = NSRange(location: lineRange.location, length: contentLength)
+                if isMarkdownShortcut(source.substring(with: contentRange)) {
+                    candidates.append(contentRange)
+                }
+                location = NSMaxRange(lineRange)
+            }
+            guard !candidates.isEmpty else { return }
+
+            isApplyingMarkdownShortcut = true
+            var selectionOffset = 0
+            for contentRange in candidates.reversed() {
+                let line = source.substring(with: contentRange)
+                let parsed = NoteMarkdown.parse(line)
+                let replacement = styledText(from: parsed)
+                let hasFormatting = parsed.runs.contains {
+                    $0[NoteBlockStyleKey.self] != nil
+                        || $0.inlinePresentationIntent != nil
+                        || $0.link != nil
+                        || $0.strikethroughStyle != nil
+                }
+                guard hasFormatting || replacement.string != line else { continue }
+                if contentRange.location < selection.location {
+                    selectionOffset += replacement.length - contentRange.length
+                }
+                storage.replaceCharacters(in: contentRange, with: replacement)
+            }
+            let newLocation = min(storage.length, max(0, selection.location + selectionOffset))
+            textView.setSelectedRange(NSRange(location: newLocation, length: 0))
+            // `makeNSView` pins `typingAttributes` explicitly at creation
+            // (plain body style), which disables NSTextView's normal
+            // fallback of re-deriving them from the character before the
+            // caret on selection change. Without this line, whatever
+            // shortcut just fired here (say "# " -> H1) restyled the text
+            // already in `storage`, but every character typed *after* it
+            // kept using the stale pinned attributes — a real bug, not
+            // hypothetical: typing "# Title" character by character turned
+            // only the "T" into a heading, since that's the one character
+            // present at the instant the shortcut matched and rewrote the
+            // line; "itle" arrived on subsequent keystrokes with no
+            // shortcut left to trigger (the "# " marker was already
+            // stripped) and no updated typing attributes to inherit.
+            // Reading the attributes actually sitting at the new caret
+            // position covers every marker in `isMarkdownShortcut`
+            // uniformly, including the checklist glyph swap, since it
+            // reflects whatever `styledText(from:)` really produced rather
+            // than reconstructing a style guess per `NoteBlockStyle` case.
+            if newLocation > 0 {
+                textView.typingAttributes = storage.attributes(at: newLocation - 1, effectiveRange: nil)
+            }
+            textView.didChangeText()
+            isApplyingMarkdownShortcut = false
+        }
+
+        private func isMarkdownShortcut(_ line: String) -> Bool {
+            if line.hasPrefix("# ") { return line.count > 2 }
+            if line.hasPrefix("## ") { return line.count > 3 }
+            if line.hasPrefix("### ") { return line.count > 4 }
+            if line.hasPrefix("> ") { return line.count > 2 }
+            if line.hasPrefix("- [ ] ") || line.hasPrefix("- [x] ") || line.hasPrefix("- [X] ") {
+                return line.count > 6
+            }
+            if line.hasPrefix("- ") { return line.count > 2 }
+
+            guard let dot = line.firstIndex(of: ".") else { return false }
+            let ordinal = line[..<dot]
+            let remainder = line[dot...]
+            return !ordinal.isEmpty
+                && ordinal.allSatisfy(\.isNumber)
+                && remainder.hasPrefix(". ")
+                && remainder.count > 2
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

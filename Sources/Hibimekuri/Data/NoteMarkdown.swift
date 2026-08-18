@@ -74,6 +74,7 @@ enum NoteMarkdown {
 
         var result = AttributedString()
         var previousBlockID: Int?
+        var previousListContainerID: Int?
         // Only the *first* run of a (possibly multi-run) list item gets its
         // marker — a bold/italic span partway through the same item is
         // still more of that one item's text, not a new item. Missing this
@@ -87,9 +88,13 @@ enum NoteMarkdown {
             var slice = AttributedString(parsed[run.range])
             let components = run.presentationIntent?.components ?? []
             let blockID = components.first?.identity
+            let listContainerID = listContainerIdentity(components)
 
             if let previousBlockID, blockID != previousBlockID {
-                result += AttributedString("\n")
+                let startsNewListGroup = listContainerID != nil
+                    && previousListContainerID != nil
+                    && listContainerID != previousListContainerID
+                result += AttributedString(startsNewListGroup ? "\n\n" : "\n")
             }
 
             if let level = headerLevel(components) {
@@ -122,6 +127,7 @@ enum NoteMarkdown {
 
             result += slice
             previousBlockID = blockID
+            previousListContainerID = listContainerID
         }
 
         return result
@@ -177,8 +183,23 @@ enum NoteMarkdown {
         // paragraph, both single-newline-joined, survived one round trip
         // intact but came back on the second as the paragraph's text
         // merged straight into the blockquote.
+        //
+        // A blank `Line` (empty text, no block style) can show up here for
+        // two different reasons: a paragraph break the user actually typed,
+        // or the literal "\n\n" `parse()` inserts between two adjacent
+        // lists of different types so they render visibly separated in the
+        // WYSIWYG editor (see `listContainerIdentity` above) — and that one
+        // logical gap can span *multiple* blank `Line`s once a "\n\n" run
+        // gets split on "\n". Since Markdown doesn't distinguish "one blank
+        // line" from "several" (both just mean "new paragraph"), every run
+        // of one or more blank lines collapses to exactly one "\n\n" here,
+        // and `pendingBlankSeparator` stops the line right after it from
+        // adding a second one on top — without this, that gap serialized as
+        // three blank lines instead of one, compounding a little further on
+        // every formatted-mode round trip.
         var output = ""
         var previousWasListItem = false
+        var pendingBlankSeparator = false
         var index = 0
         while index < markdownLines.count {
             if lines[index].blockStyle == .code {
@@ -190,16 +211,28 @@ enum NoteMarkdown {
                 if !output.isEmpty { output += "\n\n" }
                 output += "```\n" + codeLines.joined(separator: "\n") + "\n```"
                 previousWasListItem = false
+                pendingBlankSeparator = false
                 continue
             }
 
             let line = markdownLines[index]
+            guard !line.isEmpty else {
+                if !output.isEmpty && !pendingBlankSeparator {
+                    output += "\n\n"
+                    pendingBlankSeparator = true
+                }
+                previousWasListItem = false
+                index += 1
+                continue
+            }
+
             let isListItem = Self.isListItemLine(line)
-            if !output.isEmpty {
+            if !output.isEmpty && !pendingBlankSeparator {
                 output += (previousWasListItem && isListItem) ? "\n" : "\n\n"
             }
             output += line
             previousWasListItem = isListItem
+            pendingBlankSeparator = false
             index += 1
         }
         return output
@@ -309,6 +342,18 @@ enum NoteMarkdown {
             case let .listItem(ordinal):
                 let ordered = components.contains { if case .orderedList = $0.kind { return true }; return false }
                 return ordered ? "\(ordinal). " : "- "
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
+    private static func listContainerIdentity(_ components: [PresentationIntent.IntentType]) -> Int? {
+        for component in components {
+            switch component.kind {
+            case .unorderedList, .orderedList:
+                return component.identity
             default:
                 continue
             }
