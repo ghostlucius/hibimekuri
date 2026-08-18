@@ -1,0 +1,244 @@
+:root {
+  color-scheme: light;
+  --paper: #f6f3eb;
+  --ink: #2f2c27;
+  --muted: #756e63;
+  --rule: #d4cdc0;
+  --accent: #5c7354;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+a {
+  color: inherit;
+}
+
+.site-header,
+main,
+footer {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+.site-header {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rule);
+}
+
+.wordmark {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-decoration: none;
+}
+
+.source-link,
+footer a {
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.source-link:hover,
+footer a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.intro {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  gap: 52px;
+  align-items: center;
+  padding: 92px 0 76px;
+}
+
+.eyebrow {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 4px;
+  font-size: 54px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+h2 {
+  margin-bottom: 8px;
+  font-size: 32px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.japanese {
+  margin-bottom: 28px;
+  font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-size: 29px;
+}
+
+.japanese.small {
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.lede {
+  margin-bottom: 10px;
+  font-size: 24px;
+}
+
+.intro-text,
+.feature-copy > p:last-child,
+.philosophy > p:last-child,
+.privacy > p:last-child {
+  max-width: 480px;
+  color: var(--muted);
+  font-size: 17px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border: 1px solid var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.button-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.button-primary:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.button-secondary:hover {
+  background: #ebe6db;
+}
+
+img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.hero-image {
+  border: 1px solid var(--rule);
+}
+
+.philosophy,
+.privacy {
+  max-width: 720px;
+  padding: 68px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.features {
+  border-top: 1px solid var(--rule);
+}
+
+.feature {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.7fr) minmax(0, 1.3fr);
+  gap: 56px;
+  align-items: center;
+  padding: 72px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.feature-reversed .feature-copy {
+  grid-column: 2;
+}
+
+.feature-reversed img {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+footer {
+  min-height: 96px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .site-header,
+  main,
+  footer {
+    width: min(100% - 32px, 1180px);
+  }
+
+  .intro,
+  .feature {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .intro {
+    padding: 56px 0;
+  }
+
+  h1 {
+    font-size: 44px;
+  }
+
+  h2 {
+    font-size: 28px;
+  }
+
+  .feature {
+    padding: 52px 0;
+  }
+
+  .feature-reversed .feature-copy,
+  .feature-reversed img {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
