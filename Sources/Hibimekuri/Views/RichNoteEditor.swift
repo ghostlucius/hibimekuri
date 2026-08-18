@@ -145,6 +145,7 @@ private struct AppKitRichTextEditor: NSViewRepresentable {
             guard source.length > 0 else { return }
 
             let selection = textView.selectedRange()
+            let originalTypingAttributes = textView.typingAttributes
             var candidates: [NSRange] = []
             var location = 0
             while location < source.length {
@@ -160,8 +161,10 @@ private struct AppKitRichTextEditor: NSViewRepresentable {
 
             isApplyingMarkdownShortcut = true
             var selectionOffset = 0
+            var selectionUsesBlockShortcut = false
             for contentRange in candidates.reversed() {
                 let line = source.substring(with: contentRange)
+                let isBlockShortcut = isBlockMarkdownShortcut(line)
                 let parsed = NoteMarkdown.parse(line)
                 let replacement = styledText(from: parsed)
                 let hasFormatting = parsed.runs.contains {
@@ -173,6 +176,10 @@ private struct AppKitRichTextEditor: NSViewRepresentable {
                 guard hasFormatting || replacement.string != line else { continue }
                 if contentRange.location < selection.location {
                     selectionOffset += replacement.length - contentRange.length
+                }
+                if selection.location >= contentRange.location,
+                   selection.location <= NSMaxRange(contentRange) {
+                    selectionUsesBlockShortcut = isBlockShortcut
                 }
                 storage.replaceCharacters(in: contentRange, with: replacement)
             }
@@ -196,14 +203,92 @@ private struct AppKitRichTextEditor: NSViewRepresentable {
             // uniformly, including the checklist glyph swap, since it
             // reflects whatever `styledText(from:)` really produced rather
             // than reconstructing a style guess per `NoteBlockStyle` case.
-            if newLocation > 0 {
+            if selectionUsesBlockShortcut, newLocation > 0 {
                 textView.typingAttributes = storage.attributes(at: newLocation - 1, effectiveRange: nil)
+            } else {
+                // Inline Markdown removes its delimiters only after a
+                // complete span exists. Keep the attributes from before the
+                // replacement so typing after `*italic*` or `**bold**`
+                // continues as normal body text.
+                textView.typingAttributes = originalTypingAttributes
             }
             textView.didChangeText()
             isApplyingMarkdownShortcut = false
         }
 
         private func isMarkdownShortcut(_ line: String) -> Bool {
+            if isBlockMarkdownShortcut(line) { return true }
+
+            // Foundation owns the supported inline syntax. Only ask it when
+            // a possible delimiter exists, then require it to both remove
+            // syntax and add a real inline attribute. This recognizes
+            // complete `*italic*`, `**bold**`, `~~strike~~`, and links while
+            // leaving an unfinished or literal asterisk alone.
+            let hasCompleteAsteriskSpan = line.contains("*")
+                && containsCompleteDelimitedSpan(line, delimiter: "*", allowedCounts: [1, 2, 3])
+            let hasCompleteStrikethrough = line.contains("~")
+                && containsCompleteDelimitedSpan(line, delimiter: "~", allowedCounts: [2])
+            let mayContainLink = line.contains("[")
+            guard hasCompleteAsteriskSpan || hasCompleteStrikethrough || mayContainLink else { return false }
+            let parsed = NoteMarkdown.parse(line)
+            return String(parsed.characters) != line && parsed.runs.contains {
+                $0.inlinePresentationIntent != nil || $0.link != nil || $0.strikethroughStyle != nil
+            }
+        }
+
+        /// A live formatted editor sees every keystroke. Do not let
+        /// `**bold*` be parsed as the inner `*bold*` italic span while the
+        /// person is still typing its second closing delimiter. A delimiter
+        /// converts only after a closing run of the same length exists.
+        private func containsCompleteDelimitedSpan(
+            _ line: String,
+            delimiter: Character,
+            allowedCounts: Set<Int>
+        ) -> Bool {
+            let characters = Array(line)
+            var index = 0
+
+            while index < characters.count {
+                guard characters[index] == delimiter else {
+                    index += 1
+                    continue
+                }
+
+                var openingCount = 0
+                while index + openingCount < characters.count,
+                      characters[index + openingCount] == delimiter {
+                    openingCount += 1
+                }
+                guard allowedCounts.contains(openingCount) else {
+                    index += openingCount
+                    continue
+                }
+
+                let contentStart = index + openingCount
+                var cursor = contentStart
+                while cursor < characters.count {
+                    guard characters[cursor] == delimiter else {
+                        cursor += 1
+                        continue
+                    }
+
+                    var closingCount = 0
+                    while cursor + closingCount < characters.count,
+                          characters[cursor + closingCount] == delimiter {
+                        closingCount += 1
+                    }
+                    if closingCount == openingCount, cursor > contentStart {
+                        return true
+                    }
+                    cursor += closingCount
+                }
+
+                index += openingCount
+            }
+            return false
+        }
+
+        private func isBlockMarkdownShortcut(_ line: String) -> Bool {
             if line.hasPrefix("# ") { return line.count > 2 }
             if line.hasPrefix("## ") { return line.count > 3 }
             if line.hasPrefix("### ") { return line.count > 4 }

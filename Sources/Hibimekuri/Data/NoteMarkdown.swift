@@ -30,6 +30,14 @@ struct NoteBlockStyleKey: AttributedStringKey {
     static let name = "com.hibimekuri.noteBlockStyle"
 }
 
+/// Fenced-code info strings (for example `swift` in ```swift) do not have a
+/// native `AttributedString` equivalent. Keep them alongside the code style so
+/// opening formatted mode never silently removes that Markdown metadata.
+struct NoteCodeLanguageKey: AttributedStringKey {
+    typealias Value = String
+    static let name = "com.hibimekuri.noteCodeLanguage"
+}
+
 /// Converts between the plain-Markdown `String` `DiaryEntry.journalText` is
 /// stored as and the `AttributedString` `RichNoteEditor` edits live. Scoped
 /// to what the editor's own toolbar can produce plus what a person would
@@ -45,10 +53,45 @@ struct NoteBlockStyleKey: AttributedStringKey {
 /// corrupting it.
 enum NoteMarkdown {
     private static let appKitBlockStyleKey = NSAttributedString.Key("com.hibimekuri.noteBlockStyle")
+    private static let appKitCodeLanguageKey = NSAttributedString.Key("com.hibimekuri.noteCodeLanguage")
     private static let appKitInlineIntentKey = NSAttributedString.Key("com.hibimekuri.inlinePresentationIntent")
+    private static let emptyCodeBlockMarker = "\u{200B}"
 
     static func parse(_ markdown: String) -> AttributedString {
         guard !markdown.isEmpty else { return AttributedString("") }
+        let groups = topLevelGroups(in: markdown)
+
+        // Foundation's Markdown parser intentionally removes blank-line
+        // characters, retaining only block metadata. That means it cannot
+        // tell a continuous list from two same-kind lists separated by a
+        // blank line after the fact. Split before parsing so the formatted
+        // editor keeps the writer's visible paragraph/list grouping.
+        return groups.reduce(into: AttributedString()) { result, group in
+            switch group {
+            case .content(let source):
+                result += parseGroup(source)
+            case .separator(let source):
+                result += AttributedString(source)
+            }
+        }
+    }
+
+    private static func parseGroup(_ markdown: String) -> AttributedString {
+        if let codeBlock = fencedCodeBlock(in: markdown) {
+            // An empty attributed string has no run for AppKit to carry our
+            // code-style and language attributes through the live editor.
+            // Keep one invisible marker internally, then remove it again
+            // while serializing so an empty fence remains exactly empty.
+            let contents = codeBlock.contents.isEmpty ? emptyCodeBlockMarker : codeBlock.contents
+            var result = AttributedString(contents)
+            result.font = .system(size: 11, design: .monospaced)
+            result[NoteBlockStyleKey.self] = .code
+            if let language = codeBlock.language {
+                result[NoteCodeLanguageKey.self] = language
+            }
+            return result
+        }
+
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
         guard let parsed = try? AttributedString(markdown: markdown, options: options) else {
             return AttributedString(markdown)
@@ -133,6 +176,105 @@ enum NoteMarkdown {
         return result
     }
 
+    private struct FencedCodeBlock {
+        let contents: String
+        let language: String?
+    }
+
+    private static func fencedCodeBlock(in markdown: String) -> FencedCodeBlock? {
+        let lines = markdown.components(separatedBy: "\n")
+        guard lines.count >= 2,
+              let openingFence = lines.first?.trimmingCharacters(in: .whitespaces),
+              openingFence.hasPrefix("```"),
+              lines.last?.trimmingCharacters(in: .whitespaces).hasPrefix("```") == true else {
+            return nil
+        }
+        let language = String(openingFence.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+        return FencedCodeBlock(
+            contents: lines.dropFirst().dropLast().joined(separator: "\n"),
+            language: language.isEmpty ? nil : language
+        )
+    }
+
+    /// Keeps source blank lines as a formatting boundary without splitting
+    /// fenced code, where blank lines are literal content.
+    private enum TopLevelGroup {
+        case content(String)
+        case separator(String)
+    }
+
+    private static func topLevelGroups(in markdown: String) -> [TopLevelGroup] {
+        var groups: [TopLevelGroup] = []
+        var currentLines: [String] = []
+        var pendingBlankLines = 0
+        var isInsideCodeFence = false
+        var needsBlockBoundary = false
+
+        func appendContent() {
+            guard !currentLines.isEmpty else { return }
+            groups.append(.content(currentLines.joined(separator: "\n")))
+            currentLines.removeAll(keepingCapacity: true)
+        }
+
+        func appendPendingSeparator(beforeContent: Bool) {
+            guard pendingBlankLines > 0 else { return }
+            // A blank line between two blocks occupies two newlines; every
+            // additional blank line contributes one more. At the beginning
+            // or end of a note, there is no second block-side newline.
+            let hasEarlierContent = groups.contains { group in
+                if case .content = group { return true }
+                return false
+            }
+            let newlineCount = pendingBlankLines + (beforeContent && hasEarlierContent ? 1 : 0)
+            groups.append(.separator(String(repeating: "\n", count: newlineCount)))
+            pendingBlankLines = 0
+        }
+
+        for line in markdown.split(separator: "\n", omittingEmptySubsequences: false) {
+            let text = String(line)
+            if text.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+                if isInsideCodeFence {
+                    currentLines.append(text)
+                    isInsideCodeFence = false
+                    appendContent()
+                    needsBlockBoundary = true
+                } else {
+                    let hadPendingSeparator = pendingBlankLines > 0
+                    let hasCurrentContent = !currentLines.isEmpty
+                    appendPendingSeparator(beforeContent: true)
+                    if needsBlockBoundary && !hadPendingSeparator {
+                        groups.append(.separator("\n"))
+                    }
+                    needsBlockBoundary = false
+                    appendContent()
+                    if hasCurrentContent {
+                        groups.append(.separator("\n"))
+                    }
+                    isInsideCodeFence = true
+                    currentLines.append(text)
+                }
+                continue
+            }
+
+            if !isInsideCodeFence, text.trimmingCharacters(in: .whitespaces).isEmpty {
+                appendContent()
+                pendingBlankLines += 1
+            } else {
+                let hadPendingSeparator = pendingBlankLines > 0
+                appendPendingSeparator(beforeContent: true)
+                if needsBlockBoundary && !hadPendingSeparator {
+                    groups.append(.separator("\n"))
+                }
+                needsBlockBoundary = false
+                currentLines.append(text)
+            }
+        }
+
+        appendContent()
+        appendPendingSeparator(beforeContent: false)
+        return groups.isEmpty ? [.content(markdown)] : groups
+    }
+
     /// `fontResolutionContext`-free, unlike an earlier version of this
     /// function — inline styling is read from `.inlinePresentationIntent`
     /// (an `OptionSet`, directly comparable) rather than `.font`, which
@@ -142,15 +284,25 @@ enum NoteMarkdown {
         struct Line {
             var text = ""
             var blockStyle: NoteBlockStyle?
+            var codeLanguage: String?
         }
         var lines: [Line] = [Line()]
 
         for run in attributed.runs {
             let text = String(attributed[run.range].characters)
             let style = run[NoteBlockStyleKey.self]
+            let codeLanguage = run[NoteCodeLanguageKey.self]
             let pieces = text.components(separatedBy: "\n")
             for (index, piece) in pieces.enumerated() {
                 if index > 0 { lines.append(Line()) }
+                // An empty line within a fenced code block is still code,
+                // not a separator between two independent code blocks.
+                if style == .code, lines[lines.count - 1].blockStyle == nil {
+                    lines[lines.count - 1].blockStyle = style
+                }
+                if style == .code, lines[lines.count - 1].codeLanguage == nil {
+                    lines[lines.count - 1].codeLanguage = codeLanguage
+                }
                 guard !piece.isEmpty else { continue }
                 if lines[lines.count - 1].blockStyle == nil {
                     lines[lines.count - 1].blockStyle = style
@@ -204,12 +356,17 @@ enum NoteMarkdown {
         while index < markdownLines.count {
             if lines[index].blockStyle == .code {
                 var codeLines: [String] = []
+                var codeLanguage: String?
                 while index < markdownLines.count, lines[index].blockStyle == .code {
-                    codeLines.append(markdownLines[index])
+                    codeLines.append(markdownLines[index] == emptyCodeBlockMarker ? "" : markdownLines[index])
+                    codeLanguage = codeLanguage ?? lines[index].codeLanguage
                     index += 1
                 }
-                if !output.isEmpty { output += "\n\n" }
-                output += "```\n" + codeLines.joined(separator: "\n") + "\n```"
+                if !output.isEmpty && !pendingBlankSeparator { output += "\n\n" }
+                let openingFence = "```" + (codeLanguage ?? "")
+                output += codeLines == [""]
+                    ? openingFence + "\n```"
+                    : openingFence + "\n" + codeLines.joined(separator: "\n") + "\n```"
                 previousWasListItem = false
                 pendingBlankSeparator = false
                 continue
@@ -217,9 +374,13 @@ enum NoteMarkdown {
 
             let line = markdownLines[index]
             guard !line.isEmpty else {
-                if !output.isEmpty && !pendingBlankSeparator {
-                    output += "\n\n"
-                    pendingBlankSeparator = true
+                if !output.isEmpty {
+                    if pendingBlankSeparator {
+                        output += "\n"
+                    } else {
+                        output += "\n\n"
+                        pendingBlankSeparator = true
+                    }
                 }
                 previousWasListItem = false
                 index += 1
@@ -252,6 +413,9 @@ enum NoteMarkdown {
             if let style = run[NoteBlockStyleKey.self], length > 0 {
                 native.addAttribute(appKitBlockStyleKey, value: style.rawValue, range: NSRange(location: location, length: length))
             }
+            if let language = run[NoteCodeLanguageKey.self], length > 0 {
+                native.addAttribute(appKitCodeLanguageKey, value: language, range: NSRange(location: location, length: length))
+            }
             if let intent = run.inlinePresentationIntent, length > 0 {
                 native.addAttribute(
                     appKitInlineIntentKey,
@@ -277,6 +441,14 @@ enum NoteMarkdown {
                   let upper = AttributedString.Index(stringRange.upperBound, within: attributed),
                   lower < upper else { return }
             attributed[lower..<upper][NoteBlockStyleKey.self] = style
+        }
+        native.enumerateAttribute(appKitCodeLanguageKey, in: fullRange) { value, range, _ in
+            guard let language = value as? String,
+                  let stringRange = Range(range, in: plainText),
+                  let lower = AttributedString.Index(stringRange.lowerBound, within: attributed),
+                  let upper = AttributedString.Index(stringRange.upperBound, within: attributed),
+                  lower < upper else { return }
+            attributed[lower..<upper][NoteCodeLanguageKey.self] = language
         }
         native.enumerateAttribute(appKitInlineIntentKey, in: fullRange) { value, range, _ in
             guard let rawValue = value as? String,
