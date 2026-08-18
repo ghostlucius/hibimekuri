@@ -57,10 +57,10 @@ with any day that has a task due marked with a red ring. Tap it again to flip ba
 
 ### Tearing off a page
 
-When you're done with today, click **Tear Off Today**. The page peels away and the
-next day appears underneath, ready to write on. Torn-off pages aren't deleted — they
-move to the [Archive](#archive), exactly like a stack of paper you kept instead of
-throwing away.
+When you're done with today, click **Tear Off Today**. The page peels away — with a
+small paper-rustle sound — and the next day appears underneath, ready to write on.
+Torn-off pages aren't deleted — they move to the [Archive](#archive), exactly like a
+stack of paper you kept instead of throwing away.
 
 You can also write and tear off several days ahead of the real calendar date if you
 want to plan in advance — tearing off a page just moves you to the next one, whatever
@@ -129,8 +129,8 @@ forward, not something you fill out fresh each morning.
 
 ## Focus Mode and formatted text
 
-The daily note (in the wide-window layout) and each task's notes field share the same
-editor, with two small icons above it:
+The daily memo, the wide-window layout's note panel, and each task's notes field all
+share the same editor, with two small icons above it:
 
 - **The expand icon** opens **Focus Mode** — a full-window, distraction-free view for
   writing, with everything else out of the way. Click the same icon again, or press
@@ -140,24 +140,21 @@ editor, with two small icons above it:
   - **Formatted** (the default) — a true WYSIWYG view. Formatting renders live as you
     apply it; you never see Markdown symbols like `**` or `#`. Select some text and a
     small floating toolbar appears above it, themed to match your current theme, with
-    buttons for headers (H1/H2/H3), **bold**, *italic*, links, blockquotes, and
-    bulleted/numbered lists.
+    buttons for headers (H1/H2/H3), **bold**, *italic*, links, blockquotes, bulleted/
+    numbered lists, checklists, and code blocks. You can also just type Markdown syntax
+    directly here — a complete marker like `# `, `- `, or `- [ ] ` converts live to its
+    formatted equivalent, the same result as pressing the matching toolbar button.
   - **Markdown** — the same content shown as raw Markdown source, for typing syntax
-    directly. This is also the only place to write a checklist — see [Writing in
-    Markdown](#writing-in-markdown).
+    directly instead of using the toolbar.
 
   Switching between the two doesn't change what's saved — it's the same text either
   way, just shown differently.
-
-The compact-page memo (used when the window is narrow) is simpler by design: it's
-plain-text editing with a read-only rendered preview, no Focus Mode, no toolbar. It
-still understands the same Markdown syntax — see below.
 
 ## Writing in Markdown
 
 Wherever Hibimekuri renders Markdown — the daily memo, the wide-window note, task
 notes, and Focus Mode — the same basic syntax works. Type it in plain text (or in
-Markdown mode, for the note/task editors) and it renders automatically.
+Markdown mode, or directly into formatted mode) and it renders automatically.
 
 | To get this | Type this |
 | --- | --- |
@@ -170,8 +167,10 @@ Markdown mode, for the note/task editors) and it renders automatically.
 | Bulleted list | `- item` |
 | Numbered list | `1. item` |
 | Checklist | `- [ ] not done` and `- [x] done` |
+| Code block | fence with three backticks (` ``` `) on their own line, before and after |
 
-**Checklists** are the one syntax with no toolbar button — type it by hand:
+**Checklists** have their own toolbar button in formatted mode, or type them by hand in
+either mode:
 
 ```
 - [ ] Pack the bag
@@ -179,19 +178,11 @@ Markdown mode, for the note/task editors) and it renders automatically.
 - [ ] Call the hotel
 ```
 
-An unchecked item shows as a `☐` box; a checked one shows as `☑`, struck through. This
-works in the note editor's Markdown mode, and in task notes the same way — a good place
-to keep a small checklist for a task without needing a separate feature for it.
+An unchecked item shows as a `☐` box; a checked one shows as `☑`, struck through — a
+good place to keep a small checklist for a task without needing a separate feature for
+it.
 
-Checklists render as real checkboxes only in the richer editor — that's the
-wide-window daily note, every task's notes field (in either window size), and Focus
-Mode. The compact-page daily memo uses a simpler renderer, so the same syntax there
-shows as a plain list item rather than a checkbox; a task's notes field still renders
-checkboxes correctly even while the window is compact.
-
-Not supported anywhere in Hibimekuri: tables, images, and nested lists. Code blocks
-(fenced with three backticks) render in the compact memo's preview, but aren't
-recognized by the richer note editor.
+Not supported anywhere in Hibimekuri: tables, images, and nested lists.
 
 ## Choosing what the daily quote shows
 
@@ -238,8 +229,8 @@ Every page you've torn off lives in the Archive, most recent first. You can:
 
 ## Themes and appearance
 
-Settings → Appearance lets you pick from five paper themes — Classic, Matcha, Washi,
-Zen, and Sakura — each with its own paper color, ink color, accent, and (in the
+Settings → Appearance lets you pick from six paper themes — Classic, Sumi, Matcha,
+Washi, Zen, and Sakura — each with its own paper color, ink color, accent, and (in the
 wide-window layout) a themed illustration. Independently, you can set Light, Dark, or
 System mode.
 
@@ -252,6 +243,10 @@ Resize the window wider and Hibimekuri switches to a two-pane layout: the calend
 side stays exactly as it is in the compact view, while tasks, your memo, and the
 tear-off button move into a dedicated pane on the right with more room to work in.
 Resize back down and it returns to the single-column compact page.
+
+The note panel's footer also has **Previous Day** and **Next Day** buttons, plus a
+jump-to-today shortcut — a quick way to look ahead and write or adjust tasks on a
+future day without tearing anything off first.
 
 ## Language
 
@@ -287,6 +282,11 @@ That shows up in a few concrete ways:
 - **Recovery** — if a data file is ever damaged or unreadable, Hibimekuri backs up the
   original automatically and starts fresh rather than losing everything silently. You'll
   see a message in Settings if this ever happens.
+- **A backup before every save, not just on damage.** Hibimekuri keeps a rolling history
+  of the last few versions of each file (`entries.previous.*.json`,
+  `tasks.previous.*.json`) right alongside the current one, written just before each
+  save. If you ever open the storage folder in Finder and notice these, that's what
+  they are — an extra safety margin, not something to clean up by hand.
 
 ## Accessibility
 
