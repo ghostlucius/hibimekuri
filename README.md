@@ -192,6 +192,10 @@ daily page, the almanac fields, tasks, Focus Mode, Markdown formatting, Custom Q
 themes, and how your data is stored. It's also linked from the app itself: Hibimekuri
 menu → About Hibimekuri → User Guide.
 
+## License
+
+Hibimekuri is open source under the [MIT License](LICENSE).
+
 ## Status
 
 Early beta, actively developed. Feedback and issues welcome once this repo opens up
