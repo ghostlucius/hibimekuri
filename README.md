@@ -6,7 +6,7 @@
 <p align="center"><em>日々めくり — turn the page, keep the day.</em></p>
 
 <p align="center">
-  <img src="docs/images/readme-hero.png" width="920" alt="Hibimekuri daily page presentation">
+  <img src="docs/images/feature-overview.png" width="920" alt="Hibimekuri compact daily page">
 </p>
 
 ## Philosophy
@@ -34,6 +34,26 @@ of paper you kept instead of throwing away.
 
 Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline rules
 — the app is meant to feel closer to a physical object on a desk than to software.
+
+## Made For The Everyday
+
+### More Room To Keep / ひとつの頁に、余白を
+
+<p align="center">
+  <img src="docs/images/feature-extended-page.png" width="920" alt="Hibimekuri extended daily page">
+</p>
+
+### Write With Structure / 形にして書く
+
+<p align="center">
+  <img src="docs/images/feature-writing.png" width="920" alt="Hibimekuri formatted Markdown writing">
+</p>
+
+### A Paper That Feels Like Yours / 好きな紙を選ぶ
+
+<p align="center">
+  <img src="docs/images/feature-paper-themes.png" width="920" alt="Hibimekuri Matcha and Zen paper themes">
+</p>
 
 ## Features
 
@@ -129,18 +149,6 @@ Minimal chrome, typography-led paper surfaces, a dominant date numeral, hairline
   actions like editing a memo or flipping to the month calendar, Reduce Motion support
   throughout, non-color signals for due-date status, and AA-contrast text across every
   theme. Task reordering is drag-based (mouse/trackpad) only for now.
-
-## Screenshots
-
-<p align="center">
-  <img src="docs/images/readme-daily-page.png" width="820" alt="Daily page with koyomi, literature, and tear-off action">
-</p>
-<p align="center">
-  <img src="docs/images/readme-tasks-data.png" width="820" alt="Task list, settings, and local JSON export">
-</p>
-<p align="center">
-  <img src="docs/images/readme-themes.png" width="820" alt="Six minimal paper themes">
-</p>
 
 ## Install
 
