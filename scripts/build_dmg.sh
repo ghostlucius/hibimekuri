@@ -15,8 +15,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="Hibimekuri"
-BUNDLE_ID="com.himekuri.tearoffdiary"
-VERSION="1.0.0"
+BUNDLE_ID="com.hibimekuri.app"
+# Keep tester builds identifiable. The beta series is bumped deliberately;
+# the build number advances automatically with every committed change.
+MARKETING_VERSION="${HIMEKURI_MARKETING_VERSION:-1.0.0}"
+BETA_NUMBER="${HIMEKURI_BETA_NUMBER:-2}"
+BUILD_NUMBER="${HIMEKURI_BUILD_NUMBER:-$(git rev-list --count HEAD)}"
+RELEASE_LABEL="${HIMEKURI_RELEASE_LABEL:-${MARKETING_VERSION}-beta.${BETA_NUMBER}.${BUILD_NUMBER}}"
 DIST_DIR="dist"
 STAGING_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/hibimekuri_build.XXXXXX")"
 APP_DIR="$STAGING_ROOT/$APP_NAME.app"
@@ -77,9 +82,9 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>CFBundleIdentifier</key>
     <string>$BUNDLE_ID</string>
     <key>CFBundleVersion</key>
-    <string>$VERSION</string>
+    <string>$BUILD_NUMBER</string>
     <key>CFBundleShortVersionString</key>
-    <string>$VERSION</string>
+    <string>$MARKETING_VERSION</string>
     <key>CFBundleExecutable</key>
     <string>$APP_NAME</string>
     <key>CFBundleIconFile</key>
@@ -111,7 +116,7 @@ fi
 
 echo "==> Packaging .dmg"
 mkdir -p "$DIST_DIR"
-DMG_PATH="$DIST_DIR/$APP_NAME.dmg"
+DMG_PATH="$DIST_DIR/$APP_NAME-$RELEASE_LABEL.dmg"
 rm -f "$DMG_PATH"
 ln -sf /Applications "$STAGING_ROOT/Applications"
 
