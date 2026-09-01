@@ -9,8 +9,6 @@ struct EditablePageView: View {
     var onJumpToToday: (() -> Void)? = nil
 
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     /// Below this width: the compact single-column page (an iPhone-width
     /// "physical desk calendar" card). At or above it: the redesigned
     /// two-pane extended layout — a real alternate layout, not the compact
@@ -29,20 +27,14 @@ struct EditablePageView: View {
     /// grows, nothing inside it moves.
     private let compactDesignWidth = WindowMetrics.compactMaxWidth
 
-    // Only the active layout is mounted. Keeping compact and extended pages
-    // alive together creates two AppKit memo editors bound to the same text;
-    // the hidden editor can then replace its text storage during a live edit.
-    // The illustration is warmed at launch, so mounting the extended layout
-    // at the transition boundary still has a ready bitmap to fade in.
+    // Only the active layout is mounted. A transition would briefly keep the
+    // outgoing AppKit memo editor alive beside the incoming one, so layout
+    // changes intentionally swap directly rather than crossfading.
     @State private var isExtended = false
-
-    private var transitionAnimation: Animation? {
-        reduceMotion ? nil : .easeInOut(duration: 0.65)
-    }
 
     var body: some View {
         GeometryReader { geo in
-            ZStack {
+            Group {
                 if isExtended {
                     ExtendedPageView(
                         entry: $entry,
@@ -52,14 +44,11 @@ struct EditablePageView: View {
                         onNextDay: onNextDay,
                         onJumpToToday: onJumpToToday
                     )
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .transition(.opacity)
                 } else {
                     compactBody
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .transition(.opacity)
                 }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
             // The default, organic path: a live drag that crosses the
             // threshold directly (past the dead zone AppDelegate snaps,
             // not into it) updates isExtended the moment the width
@@ -70,23 +59,15 @@ struct EditablePageView: View {
             .onChange(of: geo.size.width, initial: true) { _, width in
                 let extended = width >= extendedThreshold
                 guard extended != isExtended else { return }
-                withAnimation(transitionAnimation) {
-                    isExtended = extended
-                }
-            }
-        }
-        // The dead-zone snap path: AppDelegate posts this the instant it
-        // decides which side to animate the window toward, before that
-        // animation starts — so this flip (and the crossfade it triggers)
-        // begins at the same moment the window starts resizing, not once
-        // GeometryReader's width finally reaches the target. See
-        // .layoutModeWillSnap's doc comment for the full reasoning; this is
-        // what actually removes the pause.
-        .onReceive(NotificationCenter.default.publisher(for: .layoutModeWillSnap)) { note in
-            guard let extended = note.userInfo?["isExtended"] as? Bool, extended != isExtended else { return }
-            withAnimation(transitionAnimation) {
                 isExtended = extended
             }
+        }
+        // The dead-zone snap path from AppDelegate selects the matching
+        // layout before the window animation begins. The content itself
+        // swaps directly so two native memo editors never overlap.
+        .onReceive(NotificationCenter.default.publisher(for: .layoutModeWillSnap)) { note in
+            guard let extended = note.userInfo?["isExtended"] as? Bool, extended != isExtended else { return }
+            isExtended = extended
         }
     }
 
@@ -97,8 +78,8 @@ struct EditablePageView: View {
                 HairlineDivider()
                 DailyQuoteView(date: entry.date, quote: quote)
                 HairlineDivider()
-                TaskListView()
-                MemoBox(text: $entry.journalText)
+                TaskListView(pageDate: entry.date)
+                MemoBox(text: $entry.journalText, pageDate: entry.date)
                 Spacer(minLength: 2)
                 if let onTearOff {
                     tearButton(onTearOff)

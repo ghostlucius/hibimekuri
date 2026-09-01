@@ -3,6 +3,8 @@ import AppKit
 
 struct TodayView: View {
     var catchUpRequestID = 0
+    var focusReturnDate: Date?
+    var onFocusPageRestored: () -> Void = {}
 
     @Environment(DiaryStore.self) private var store
     @Environment(QuoteStore.self) private var quoteStore
@@ -53,6 +55,7 @@ struct TodayView: View {
         .background(DS.paper.ignoresSafeArea())
         .task(id: catchUpRequestID) {
             setUpCurrentDate()
+            restoreFocusPageIfNeeded()
             if catchUpRequestID != 0, handledCatchUpRequestID != catchUpRequestID {
                 handledCatchUpRequestID = catchUpRequestID
                 catchUpToToday()
@@ -155,6 +158,22 @@ struct TodayView: View {
         currentDate = store.currentDate()
         store.ensureEntry(for: currentDate, quoteStore: quoteStore)
         scrollPositionID = currentDate
+    }
+
+    /// `RootView` deliberately unmounts the normal page while Focus Mode is
+    /// active so two native note editors never share one binding. Restore the
+    /// pager position after that replacement so leaving Focus Mode returns to
+    /// the page the user was writing on rather than always jumping to today.
+    private func restoreFocusPageIfNeeded() {
+        guard let focusReturnDate else { return }
+        let target = DiaryEntry.startOfDay(focusReturnDate)
+        guard target >= currentDate, pageDates.contains(target) else {
+            onFocusPageRestored()
+            return
+        }
+        store.ensureEntry(for: target, quoteStore: quoteStore)
+        scrollPositionID = target
+        onFocusPageRestored()
     }
 
     private func performTearOff() {

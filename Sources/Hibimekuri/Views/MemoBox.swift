@@ -5,6 +5,7 @@ import SwiftUI
 /// existing non-interactive Markdown renderer.
 struct MemoBox: View {
     @Binding var text: String
+    var pageDate: Date? = nil
     var isEditable: Bool = true
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
 
@@ -19,7 +20,8 @@ struct MemoBox: View {
                 placeholder: Localizer.t("今日の振り返りを書く…", "Write today's reflection…", language: language),
                 sectionTitle: Localizer.t("メモ", "MEMO", language: language),
                 minEditorHeight: 96,
-                maxEditorHeight: 180
+                maxEditorHeight: 180,
+                pageDate: pageDate
             )
         } else {
             readOnlyMemo

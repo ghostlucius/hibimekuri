@@ -4,17 +4,20 @@ import SwiftUI
 /// carry forward until checked off instead of resetting, and each task
 /// can expand into a notes field and a "do later" defer date.
 struct TaskListView: View {
+    var pageDate: Date? = nil
+
     @Environment(TaskStore.self) private var store
+    @Environment(TaskInteractionController.self) private var interaction
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
     @State private var newTaskText = ""
     // Single-optional, not a Set — only one task is ever open at a time
     // (matching Things), so opening a different row naturally closes
     // whichever one was open, no extra bookkeeping needed for that case.
-    @State private var expandedTaskID: UUID?
-    @State private var selectedTaskID: UUID?
     @State private var showDeferred = false
     @FocusState private var fieldFocused: Bool
+
+    private var expandedTaskID: UUID? { interaction.expandedTask(on: pageDate) }
 
     private var visibleTasks: [TaskItem] {
         store.tasks.filter { $0.archivedAt == nil && !isDeferred($0) }
@@ -133,8 +136,7 @@ struct TaskListView: View {
         // that isn't a task row (the memo, the header, blank space) just
         // closes everything, matching how Things behaves.
         .onReceive(NotificationCenter.default.publisher(for: .taskInteractionReset)) { _ in
-            selectedTaskID = nil
-            expandedTaskID = nil
+            interaction.close()
         }
         // This background is intentionally limited to the task section.
         // It receives clicks only in unused task-area space; controls and
@@ -150,14 +152,14 @@ struct TaskListView: View {
     private func row(_ task: TaskItem) -> some View {
         TaskRow(
             task: task,
-            isExpanded: expandedTaskID == task.id,
-            isSelected: selectedTaskID == task.id,
+            pageDate: pageDate,
+            isExpanded: interaction.isExpanded(task.id, on: pageDate),
+            isSelected: interaction.isSelected(task.id, on: pageDate),
             onOpen: {
-                if expandedTaskID == task.id {
-                    expandedTaskID = nil
+                if interaction.isExpanded(task.id, on: pageDate) {
+                    interaction.close()
                 } else {
-                    selectedTaskID = task.id
-                    expandedTaskID = task.id
+                    interaction.open(task.id, on: pageDate)
                 }
             },
             onSelect: {
@@ -165,11 +167,10 @@ struct TaskListView: View {
                 // task-section's explicit dismissal affordance. Native
                 // controls in the row (title, checkbox, delete) retain
                 // their own handling and do not take this route.
-                if expandedTaskID == task.id {
+                if interaction.isExpanded(task.id, on: pageDate) {
                     closeExpandedTask()
                 } else {
-                    selectedTaskID = task.id
-                    expandedTaskID = nil
+                    interaction.select(task.id, on: pageDate)
                 }
             }
         )
@@ -182,8 +183,7 @@ struct TaskListView: View {
     }
 
     private func closeExpandedTask() {
-        selectedTaskID = nil
-        expandedTaskID = nil
+        interaction.close()
     }
 }
 
@@ -215,6 +215,7 @@ private struct IconButton: View {
 
 private struct TaskRow: View {
     let task: TaskItem
+    let pageDate: Date?
     let isExpanded: Bool
     let isSelected: Bool
     let onOpen: () -> Void
@@ -227,11 +228,19 @@ private struct TaskRow: View {
     @State private var pendingDeferDate = Date()
     @FocusState private var titleFocused: Bool
 
+    /// Focus Mode outlives this row: the page intentionally unmounts while
+    /// its single editor is active. Resolve by id on every binding access so
+    /// that editor keeps reading and writing the live task rather than the
+    /// row's value snapshot.
+    private var currentTask: TaskItem {
+        store.tasks.first(where: { $0.id == task.id }) ?? task
+    }
+
     private var notesBinding: Binding<String> {
         Binding(
-            get: { task.notes },
+            get: { currentTask.notes },
             set: { newValue in
-                var updated = task
+                var updated = currentTask
                 updated.notes = newValue
                 store.update(updated)
             }
@@ -322,7 +331,11 @@ private struct TaskRow: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
-                    MarkdownNotesField(text: notesBinding, placeholder: Localizer.t("メモ", "Notes", language: language))
+                    MarkdownNotesField(
+                        text: notesBinding,
+                        placeholder: Localizer.t("メモ", "Notes", language: language),
+                        pageDate: pageDate
+                    )
 
                     deferRow
 

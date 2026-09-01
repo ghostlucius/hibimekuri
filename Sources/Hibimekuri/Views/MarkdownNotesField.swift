@@ -9,6 +9,7 @@ struct MarkdownNotesField: View {
     var sectionTitle: String? = nil
     var minEditorHeight: CGFloat = 96
     var maxEditorHeight: CGFloat? = 180
+    var pageDate: Date? = nil
 
     @Environment(FocusModeController.self) private var focusMode
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
@@ -26,7 +27,7 @@ struct MarkdownNotesField: View {
                 Spacer()
 
                 Button {
-                    focusMode.enter(editing: $text)
+                    focusMode.enter(editing: $text, from: pageDate)
                 } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: 12))

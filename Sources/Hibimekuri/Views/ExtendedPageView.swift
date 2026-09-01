@@ -114,7 +114,11 @@ struct ExtendedPageView: View {
     }
 
     private func taskSection(maxListHeight: CGFloat) -> some View {
-        ExtendedTaskSection(language: language, maxListHeight: maxListHeight)
+        ExtendedTaskSection(
+            language: language,
+            maxListHeight: maxListHeight,
+            pageDate: entry.date
+        )
     }
 
     private var noteSection: some View {
@@ -126,7 +130,7 @@ struct ExtendedPageView: View {
                     .tracking(1.2)
                 Spacer()
                 Button {
-                    focusMode.enter(editing: $entry.journalText)
+                    focusMode.enter(editing: $entry.journalText, from: entry.date)
                 } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: 12))
@@ -247,15 +251,17 @@ struct ExtendedPageView: View {
 private struct ExtendedTaskSection: View {
     let language: AppLanguage
     let maxListHeight: CGFloat
+    let pageDate: Date
 
     @Environment(TaskStore.self) private var store
+    @Environment(TaskInteractionController.self) private var interaction
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var newTaskText = ""
     // Single-optional, not a Set — only one task is ever open at a time.
-    @State private var expandedTaskID: UUID?
-    @State private var selectedTaskID: UUID?
     @State private var showDeferred = false
     @FocusState private var fieldFocused: Bool
+
+    private var expandedTaskID: UUID? { interaction.expandedTask(on: pageDate) }
 
     private var visibleTasks: [TaskItem] { store.tasks.filter { $0.archivedAt == nil && !isDeferred($0) } }
     private var activeTasks: [TaskItem] { visibleTasks.filter { !$0.isDone }.sorted { $0.order < $1.order } }
@@ -371,8 +377,7 @@ private struct ExtendedTaskSection: View {
         // TaskListView.swift's identical use of this notification for the
         // full rationale.
         .onReceive(NotificationCenter.default.publisher(for: .taskInteractionReset)) { _ in
-            selectedTaskID = nil
-            expandedTaskID = nil
+            interaction.close()
         }
         // The dismissal target belongs only to the task section, never the
         // rest of the extended page. Its background placement leaves task
@@ -388,22 +393,21 @@ private struct ExtendedTaskSection: View {
         ExtendedTaskRow(
             task: task,
             language: language,
-            isExpanded: expandedTaskID == task.id,
-            isSelected: selectedTaskID == task.id,
+            pageDate: pageDate,
+            isExpanded: interaction.isExpanded(task.id, on: pageDate),
+            isSelected: interaction.isSelected(task.id, on: pageDate),
             onOpen: {
-                if expandedTaskID == task.id {
-                    expandedTaskID = nil
+                if interaction.isExpanded(task.id, on: pageDate) {
+                    interaction.close()
                 } else {
-                    selectedTaskID = task.id
-                    expandedTaskID = task.id
+                    interaction.open(task.id, on: pageDate)
                 }
             },
             onSelect: {
-                if expandedTaskID == task.id {
+                if interaction.isExpanded(task.id, on: pageDate) {
                     closeExpandedTask()
                 } else {
-                    selectedTaskID = task.id
-                    expandedTaskID = nil
+                    interaction.select(task.id, on: pageDate)
                 }
             }
         )
@@ -416,14 +420,14 @@ private struct ExtendedTaskSection: View {
     }
 
     private func closeExpandedTask() {
-        selectedTaskID = nil
-        expandedTaskID = nil
+        interaction.close()
     }
 }
 
 private struct ExtendedTaskRow: View {
     let task: TaskItem
     let language: AppLanguage
+    let pageDate: Date
     let isExpanded: Bool
     let isSelected: Bool
     let onOpen: () -> Void
@@ -435,11 +439,18 @@ private struct ExtendedTaskRow: View {
     @State private var pendingDeferDate = Date()
     @FocusState private var titleFocused: Bool
 
+    /// See TaskRow's identical live lookup. Focus Mode removes this row
+    /// while retaining its note binding, so a captured TaskItem could become
+    /// stale after the first edit.
+    private var currentTask: TaskItem {
+        store.tasks.first(where: { $0.id == task.id }) ?? task
+    }
+
     private var titleBinding: Binding<String> {
         Binding(get: { task.title }, set: { var t = task; t.title = $0; store.update(t) })
     }
     private var notesBinding: Binding<String> {
-        Binding(get: { task.notes }, set: { var t = task; t.notes = $0; store.update(t) })
+        Binding(get: { currentTask.notes }, set: { var t = currentTask; t.notes = $0; store.update(t) })
     }
 
     /// Same relative feedback as the compact page's `TaskRow` — "in N
@@ -524,7 +535,11 @@ private struct ExtendedTaskRow: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
-                    MarkdownNotesField(text: notesBinding, placeholder: Localizer.t("メモ", "Notes", language: language))
+                    MarkdownNotesField(
+                        text: notesBinding,
+                        placeholder: Localizer.t("メモ", "Notes", language: language),
+                        pageDate: pageDate
+                    )
 
                     deferRow
 

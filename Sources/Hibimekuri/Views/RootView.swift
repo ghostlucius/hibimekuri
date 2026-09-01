@@ -10,6 +10,7 @@ struct RootView: View {
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
     @State private var catchUpRequestID = 0
     @State private var focusMode = FocusModeController()
+    @State private var taskInteraction = TaskInteractionController()
 
     /// The app's current page (see `DiaryStore.currentDate()`'s doc
     /// comment) can drift behind the real calendar date if days go by
@@ -22,36 +23,30 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            switch navigator.screen {
-            case .today:
-                TodayView(catchUpRequestID: catchUpRequestID)
-            case .archive:
-                NavigationStack {
-                    ArchiveView()
-                }
-            }
-        }
-        // Force this to fill the window BEFORE attaching the overlay, so the
-        // icon cluster is positioned relative to the real window bounds —
-        // not to whatever small size the active screen's content wants.
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Back to the raw top-trailing corner: the earlier cap-and-center
-        // wrapper existed only for when fullscreen showed the compact page
-        // centered on extra background. That approach was replaced by
-        // ExtendedPageView's own two-pane layout, which already extends to
-        // the window's real right edge, so the plain corner overlay lines
-        // up correctly in both compact and extended mode again.
-        .overlay(alignment: .topTrailing) { cornerMenu }
-        // On top of the corner icon cluster above, not beside it — Focus
-        // Mode is meant to cover the *whole* window, that cluster included.
-        .overlay {
             if focusMode.isActive, let journalText = focusMode.journalText {
                 FocusModeView(journalText: journalText, onExit: focusMode.exit)
+            } else {
+                Group {
+                    switch navigator.screen {
+                    case .today:
+                        TodayView(
+                            catchUpRequestID: catchUpRequestID,
+                            focusReturnDate: focusMode.returnDate,
+                            onFocusPageRestored: focusMode.clearReturnContext
+                        )
+                    case .archive:
+                        NavigationStack {
+                            ArchiveView()
+                        }
+                    }
+                }
+                .overlay(alignment: .topTrailing) { cornerMenu }
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: focusMode.isActive)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .environment(navigator)
         .environment(focusMode)
+        .environment(taskInteraction)
         // Tracks both an explicit Light/Dark choice and, while "System" is
         // selected, live system appearance changes — colorScheme reflects
         // NSApp's effective appearance either way. ThemeManager relies on

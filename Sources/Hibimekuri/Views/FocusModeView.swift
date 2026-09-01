@@ -2,17 +2,14 @@ import AppKit
 import SwiftUI
 
 /// Distraction-free journaling — the note fills the *entire app window*
-/// (not a separate OS-level fullscreen/window), covering the calendar,
-/// tasks, and even the corner Today/Archive icon cluster. `RootView` is
-/// what actually shows this, as its own topmost overlay, so it can sit
-/// above everything else regardless of which layout (compact/extended)
-/// is active underneath.
+/// (not a separate OS-level fullscreen/window). `RootView` replaces the
+/// normal page with this view while it is active, so only this editor owns
+/// the note's text binding.
 struct FocusModeView: View {
     @Binding var journalText: String
     let onExit: () -> Void
 
     @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appLanguage") private var language: AppLanguage = .japanese
     @State private var noteMode: NoteEditorMode = .formatted
     @State private var escapeMonitor: Any?
@@ -72,7 +69,6 @@ struct FocusModeView: View {
         .background(DS.paper)
         .foregroundStyle(DS.text)
         .onExitCommand(perform: onExit)
-        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98)))
         .onAppear(perform: installEscapeMonitor)
         .onDisappear(perform: removeEscapeMonitor)
     }
