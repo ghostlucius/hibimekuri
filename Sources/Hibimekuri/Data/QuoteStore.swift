@@ -9,7 +9,7 @@ final class QuoteStore {
     }
 
     private func load() {
-        guard let url = Bundle.module.url(forResource: "quotes", withExtension: "json"),
+        guard let url = AppResources.bundle.url(forResource: "quotes", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let decoded = try? JSONDecoder().decode([Quote].self, from: data) else {
             quotes = []

@@ -9,7 +9,7 @@ final class WordStore {
     }
 
     private func load() {
-        guard let url = Bundle.module.url(forResource: "words", withExtension: "json"),
+        guard let url = AppResources.bundle.url(forResource: "words", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let decoded = try? JSONDecoder().decode([WordOfDay].self, from: data) else {
             words = []

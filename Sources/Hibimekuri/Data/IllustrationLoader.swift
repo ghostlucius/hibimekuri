@@ -77,7 +77,7 @@ enum IllustrationLoader {
     /// Runs off the main actor — `NSGraphicsContext.current` is thread-local,
     /// so drawing into a private bitmap rep here touches no shared UI state.
     nonisolated private static func rasterize(named name: String) -> NSImage? {
-        guard let url = Bundle.module.url(forResource: name, withExtension: "svg"),
+        guard let url = AppResources.bundle.url(forResource: name, withExtension: "svg"),
               let vector = NSImage(contentsOf: url) else { return nil }
 
         let size = vector.size
