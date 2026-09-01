@@ -56,7 +56,11 @@ lipo "$APP_DIR/Contents/MacOS/$APP_NAME" -verify_arch arm64 x86_64
 
 RESOURCE_BUNDLE=".build/arm64-apple-macosx/release/${APP_NAME}_${APP_NAME}.bundle"
 if [ -d "$RESOURCE_BUNDLE" ]; then
-    cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
+    # SwiftPM's generated Bundle.module accessor resolves processed resources
+    # from Bundle.main.bundleURL (the .app itself), not Contents/Resources.
+    # Putting this at the .app root keeps installed builds from crashing before
+    # launch while local `swift run` continues to use SwiftPM's build bundle.
+    cp -R "$RESOURCE_BUNDLE" "$APP_DIR/"
 fi
 
 # App icon: two light/dark variants (see scripts/generate_app_icon.swift)
