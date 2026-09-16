@@ -167,6 +167,26 @@ img {
   border: 1px solid var(--rule);
 }
 
+.demo {
+  padding: 68px 0;
+  border-top: 1px solid var(--rule);
+  text-align: center;
+}
+
+.demo h2 {
+  margin-bottom: 28px;
+}
+
+.demo-video {
+  display: block;
+  width: 100%;
+  max-width: 860px;
+  height: auto;
+  margin: 0 auto;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
 .philosophy,
 .privacy {
   max-width: 720px;
