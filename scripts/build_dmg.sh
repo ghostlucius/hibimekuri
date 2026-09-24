@@ -40,26 +40,27 @@ echo "==> Building release binary (arm64 + x86_64, merged into a universal binar
 # may be Intel — a plain `swift build -c release` only produces a binary
 # for the host machine's own architecture (arm64 here), which won't launch
 # at all on an Intel Mac (there's no Rosetta translation in that
-# direction). Building each slice separately and merging with `lipo`
-# matches Apple's documented approach for a universal macOS binary built
-# outside Xcode.
-swift build -c release --arch arm64
-swift build -c release --arch x86_64
+# direction). Passing both --arch flags builds the universal binary in
+# one pass. Where it lands depends on the toolchain's build system, so
+# ask SwiftPM instead of hardcoding a path: a hardcoded path once pointed
+# at a stale binary from an earlier build that the newer build system no
+# longer overwrote.
+BUILD_FLAGS=(-c release --arch arm64 --arch x86_64)
+swift build "${BUILD_FLAGS[@]}"
+BIN_DIR="$(swift build "${BUILD_FLAGS[@]}" --show-bin-path)"
 
 echo "==> Assembling $APP_NAME.app (staged outside iCloud Drive at $STAGING_ROOT)"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
-lipo -create -output "$APP_DIR/Contents/MacOS/$APP_NAME" \
-    ".build/arm64-apple-macosx/release/$APP_NAME" \
-    ".build/x86_64-apple-macosx/release/$APP_NAME"
-lipo "$APP_DIR/Contents/MacOS/$APP_NAME" -verify_arch arm64 x86_64
+cp "$BIN_DIR/$APP_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME"
+# One arch per check: newer lipo rejects several after -verify_arch.
+for arch in arm64 x86_64; do
+    lipo "$APP_DIR/Contents/MacOS/$APP_NAME" -verify_arch "$arch"
+done
 
-RESOURCE_BUNDLE=".build/arm64-apple-macosx/release/${APP_NAME}_${APP_NAME}.bundle"
-if [ -d "$RESOURCE_BUNDLE" ]; then
-    # AppResources resolves this processed SwiftPM bundle from the standard,
-    # signed app-resource location at runtime.
-    cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
-fi
+# AppResources resolves this processed SwiftPM bundle from the standard,
+# signed app-resource location at runtime; the app can't run without it.
+cp -R "$BIN_DIR/${APP_NAME}_${APP_NAME}.bundle" "$APP_DIR/Contents/Resources/"
 
 # App icon: two light/dark variants (see scripts/generate_app_icon.swift)
 # copied to the top level of Contents/Resources — CFBundleIconFile below
