@@ -100,6 +100,9 @@ enum JSONFilePersistence {
         Localizer.t(
             "\(fileName) の保存で問題が発生しました: \(error.localizedDescription)",
             "There was a problem saving \(fileName): \(error.localizedDescription)",
+            it: "Si è verificato un problema durante il salvataggio di \(fileName): \(error.localizedDescription)",
+            fr: "Un problème est survenu lors de l'enregistrement de \(fileName) : \(error.localizedDescription)",
+            es: "Hubo un problema al guardar \(fileName): \(error.localizedDescription)",
             language: language
         )
     }

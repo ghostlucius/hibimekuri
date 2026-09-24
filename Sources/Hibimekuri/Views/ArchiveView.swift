@@ -64,7 +64,7 @@ private struct ArchiveRow: View {
             VStack {
                 Text(day.dayNumber)
                     .font(.system(size: 22, weight: .black))
-                Text(day.weekdayLabel(language: .english).prefix(3).uppercased())
+                Text(day.weekdayLabel(language: language == .japanese ? .english : language).prefix(3).uppercased())
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary)
             }

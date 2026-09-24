@@ -112,7 +112,7 @@ struct TaskListView: View {
                 Button {
                     withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { showDeferred.toggle() }
                 } label: {
-                    Text(Localizer.t("＋\(deferredTasks.count)件 予定あり", "+\(deferredTasks.count) scheduled", language: language))
+                    Text(Localizer.t("＋\(deferredTasks.count)件 予定あり", "+\(deferredTasks.count) scheduled", it: "+\(deferredTasks.count) programmate", fr: "+\(deferredTasks.count) planifiées", es: "+\(deferredTasks.count) programadas", language: language))
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
@@ -276,7 +276,7 @@ private struct TaskRow: View {
         case 1:
             return (Localizer.t("明日", "Tomorrow", language: language), false)
         default:
-            return (Localizer.t("\(days)日後", "in \(days) days", language: language), false)
+            return (Localizer.t("\(days)日後", "in \(days) days", it: "tra \(days) giorni", fr: "dans \(days) jours", es: "en \(days) días", language: language), false)
         }
     }
 

@@ -31,14 +31,35 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 enum AppLanguage: String, CaseIterable, Identifiable {
     case japanese
     case english
+    case italian
+    case french
+    case spanish
 
     /// Used until the user picks a language in Settings.
     static let fallback: AppLanguage = .english
 
     var id: String { rawValue }
 
+    /// Always shown in the language's own name, so someone who landed in
+    /// the wrong language can still find theirs.
     var displayName: String {
-        self == .japanese ? "日本語" : "English"
+        switch self {
+        case .japanese: "日本語"
+        case .english: "English"
+        case .italian: "Italiano"
+        case .french: "Français"
+        case .spanish: "Español"
+        }
+    }
+
+    var locale: Locale {
+        switch self {
+        case .japanese: Locale(identifier: "ja_JP")
+        case .english: Locale(identifier: "en_US")
+        case .italian: Locale(identifier: "it_IT")
+        case .french: Locale(identifier: "fr_FR")
+        case .spanish: Locale(identifier: "es_ES")
+        }
     }
 }
 

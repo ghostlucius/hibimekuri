@@ -25,7 +25,7 @@ struct ArchiveDetailView: View {
 
                 HStack {
                     if entry.isCompleted, let completedAt = entry.completedAt {
-                        Text(Localizer.t("切り取り時刻 \(completedAt.formatted(date: .omitted, time: .shortened))", "Torn off \(completedAt.formatted(date: .omitted, time: .shortened))", language: language))
+                        Text(Localizer.t("切り取り時刻 \(completedAt.formatted(date: .omitted, time: .shortened))", "Torn off \(completedAt.formatted(date: .omitted, time: .shortened))", it: "Strappata alle \(completedAt.formatted(date: .omitted, time: .shortened))", fr: "Détachée à \(completedAt.formatted(date: .omitted, time: .shortened))", es: "Arrancada a las \(completedAt.formatted(date: .omitted, time: .shortened))", language: language))
                             .font(.system(size: 11))
                             .foregroundStyle(.tertiary)
                     }

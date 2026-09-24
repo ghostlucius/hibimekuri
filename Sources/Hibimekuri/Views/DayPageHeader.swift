@@ -153,7 +153,7 @@ struct DayPageHeader: View {
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Text(day.weekdayLabel(language: .english))
+                    Text(day.weekdayLabel(language: language))
                         .font(DS.displayFont(size: 24, weight: .bold))
                 }
                 Spacer()

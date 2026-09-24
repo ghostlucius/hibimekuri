@@ -44,7 +44,7 @@ struct AboutView: View {
             VStack(spacing: 4) {
                 Text("Hibimekuri")
                     .font(.system(size: 22, weight: .bold))
-                Text(Localizer.t("バージョン \(versionString)", "Version \(versionString)", language: language))
+                Text(Localizer.t("バージョン \(versionString)", "Version \(versionString)", it: "Versione \(versionString)", fr: "Version \(versionString)", es: "Versión \(versionString)", language: language))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                 Text(Localizer.t("作者: Luciano Villani", "by Luciano Villani", language: language))

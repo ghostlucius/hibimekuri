@@ -235,11 +235,11 @@ struct SettingsView: View {
                 // that used to open from here — so what's left in Settings
                 // is purely numbers about your own data.
                 section(Localizer.t("統計", "STATISTICS", language: language)) {
-                    Text(Localizer.t("\(store.entries.count) 件の記録", "\(store.entries.count) entries recorded", language: language))
+                    Text(Localizer.t("\(store.entries.count) 件の記録", "\(store.entries.count) entries recorded", it: "\(store.entries.count) voci registrate", fr: "\(store.entries.count) entrées enregistrées", es: "\(store.entries.count) entradas registradas", language: language))
                         .font(.system(size: 12))
-                    Text(Localizer.t("\(taskStore.tasks.count) 件のタスク", "\(taskStore.tasks.count) tasks tracked", language: language))
+                    Text(Localizer.t("\(taskStore.tasks.count) 件のタスク", "\(taskStore.tasks.count) tasks tracked", it: "\(taskStore.tasks.count) attività registrate", fr: "\(taskStore.tasks.count) tâches suivies", es: "\(taskStore.tasks.count) tareas registradas", language: language))
                         .font(.system(size: 12))
-                    Text(Localizer.t("\(quoteStore.quotes.count) 件の名言を収録", "\(quoteStore.quotes.count) quotes bundled", language: language))
+                    Text(Localizer.t("\(quoteStore.quotes.count) 件の名言を収録", "\(quoteStore.quotes.count) quotes bundled", it: "\(quoteStore.quotes.count) citazioni incluse", fr: "\(quoteStore.quotes.count) citations incluses", es: "\(quoteStore.quotes.count) citas incluidas", language: language))
                         .font(.system(size: 12))
                     Text(Localizer.t(
                         "干支・六曜・十二直・旧暦は天文計算による近似値です。日本の公式暦要項ではありません。",
@@ -288,6 +288,11 @@ struct SettingsView: View {
     private func languageButton(_ option: AppLanguage) -> some View {
         Button {
             language = option
+            // Word of the day is English-only; without this the quote
+            // picker would be left with no visible selection.
+            if option != .english, quoteStyle == .englishWord {
+                quoteStyle = .japaneseIdiom
+            }
         } label: {
             Text(option.displayName)
                 .font(.system(size: 12, weight: .semibold))

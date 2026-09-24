@@ -12,13 +12,13 @@ struct QuoteCardView: View {
                 .tracking(1.2)
 
             // The idiom itself always stays in Japanese — only the app's
-            // chrome translates. English mode adds the meaning underneath
+            // chrome translates. Other languages add the meaning underneath
             // rather than replacing the original text.
             Text(quote.japanese)
                 .font(.system(size: 16, weight: .medium))
 
-            if language == .english {
-                Text(quote.english)
+            if let meaning = quote.meaning(in: language) {
+                Text(meaning)
                     .font(.system(size: 12, weight: .regular))
                     .italic()
                     .foregroundStyle(.secondary)
@@ -33,11 +33,10 @@ struct QuoteCardView: View {
     }
 
     private var sourceLabel: String {
-        switch (quote.source, language) {
-        case (.proverb, .japanese): return "ことわざ"
-        case (.yojijukugo, .japanese): return "四字熟語"
-        case (.literature, .japanese): return "文学"
-        default: return quote.source.label
+        switch quote.source {
+        case .proverb: Localizer.t("ことわざ", quote.source.label, language: language)
+        case .yojijukugo: Localizer.t("四字熟語", quote.source.label, language: language)
+        case .literature: Localizer.t("文学", quote.source.label, language: language)
         }
     }
 }

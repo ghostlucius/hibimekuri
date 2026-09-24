@@ -63,9 +63,14 @@ struct CalendarDay {
     }
 
     func fullDateLabel(language: AppLanguage) -> String {
-        if language == .english {
-            return Self.englishFullDateFormatter.string(from: date)
+        switch language {
+        case .japanese: return Self.japaneseFullDateFormatter.string(from: date)
+        case .english: return Self.englishFullDateFormatter.string(from: date)
+        default:
+            let formatter = DateFormatter()
+            formatter.locale = language.locale
+            formatter.setLocalizedDateFormatFromTemplate("dMMMMyyyy")
+            return formatter.string(from: date)
         }
-        return Self.japaneseFullDateFormatter.string(from: date)
     }
 }
