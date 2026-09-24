@@ -8,7 +8,7 @@ struct EditablePageView: View {
     var onNextDay: (() -> Void)? = nil
     var onJumpToToday: (() -> Void)? = nil
 
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     /// Below this width: the compact single-column page (an iPhone-width
     /// "physical desk calendar" card). At or above it: the redesigned
     /// two-pane extended layout — a real alternate layout, not the compact

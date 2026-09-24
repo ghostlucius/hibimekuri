@@ -49,8 +49,8 @@ enum TaskNotificationScheduler {
     /// does, since this runs from `TaskStore` mutations that have no
     /// View/App context to read `@AppStorage` from.
     private static var currentLanguage: AppLanguage {
-        let raw = UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.japanese.rawValue
-        return AppLanguage(rawValue: raw) ?? .japanese
+        let raw = UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.fallback.rawValue
+        return AppLanguage(rawValue: raw) ?? .fallback
     }
 
     /// Replaces all open reminders from the current task snapshot. Call this

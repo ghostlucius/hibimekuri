@@ -3,7 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     var onDismiss: () -> Void
 
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {

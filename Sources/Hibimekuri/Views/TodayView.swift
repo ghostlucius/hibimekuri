@@ -9,7 +9,7 @@ struct TodayView: View {
     @Environment(DiaryStore.self) private var store
     @Environment(QuoteStore.self) private var quoteStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
 
     @State private var currentDate: Date = DiaryEntry.startOfDay(Date())
     @State private var revealDate: Date?

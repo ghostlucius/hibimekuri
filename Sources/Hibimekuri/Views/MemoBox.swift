@@ -7,7 +7,7 @@ struct MemoBox: View {
     @Binding var text: String
     var pageDate: Date? = nil
     var isEditable: Bool = true
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
 
     private var renderedMarkdown: AttributedString {
         BlockMarkdownRenderer.render(text)

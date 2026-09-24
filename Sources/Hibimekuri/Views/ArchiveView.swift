@@ -3,7 +3,7 @@ import SwiftUI
 struct ArchiveView: View {
     @Environment(DiaryStore.self) private var store
     @Environment(QuoteStore.self) private var quoteStore
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     @State private var searchText = ""
 
     private var pastEntries: [DiaryEntry] {

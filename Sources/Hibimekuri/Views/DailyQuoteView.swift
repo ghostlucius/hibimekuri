@@ -11,7 +11,7 @@ struct DailyQuoteView: View {
 
     @Environment(WordStore.self) private var wordStore
     @Environment(CustomQuoteStore.self) private var customQuoteStore
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     @AppStorage("quoteStyle") private var quoteStyle: QuoteStyle = .japaneseIdiom
 
     var body: some View {

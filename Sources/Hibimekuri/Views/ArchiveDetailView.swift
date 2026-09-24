@@ -6,7 +6,7 @@ struct ArchiveDetailView: View {
 
     @Environment(DiaryStore.self) private var store
     @Environment(Navigator.self) private var navigator
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
 
     private var day: CalendarDay { CalendarDay(date: entry.date) }
 

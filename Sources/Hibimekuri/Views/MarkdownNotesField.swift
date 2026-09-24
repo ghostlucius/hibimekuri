@@ -12,7 +12,7 @@ struct MarkdownNotesField: View {
     var pageDate: Date? = nil
 
     @Environment(FocusModeController.self) private var focusMode
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     @State private var noteMode: NoteEditorMode = .formatted
 
     var body: some View {

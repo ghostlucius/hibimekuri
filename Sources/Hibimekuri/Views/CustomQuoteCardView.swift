@@ -2,7 +2,7 @@ import SwiftUI
 
 struct CustomQuoteCardView: View {
     let quote: CustomQuote
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {

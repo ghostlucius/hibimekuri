@@ -9,7 +9,7 @@ struct TaskListView: View {
     @Environment(TaskStore.self) private var store
     @Environment(TaskInteractionController.self) private var interaction
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     @State private var newTaskText = ""
     // Single-optional, not a Set — only one task is ever open at a time
     // (matching Things), so opening a different row naturally closes
@@ -223,7 +223,7 @@ private struct TaskRow: View {
 
     @Environment(TaskStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     @State private var showDatePicker = false
     @State private var pendingDeferDate = Date()
     @FocusState private var titleFocused: Bool

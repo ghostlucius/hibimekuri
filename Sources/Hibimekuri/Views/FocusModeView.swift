@@ -10,7 +10,7 @@ struct FocusModeView: View {
     let onExit: () -> Void
 
     @Environment(ThemeManager.self) private var themeManager
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     @State private var noteMode: NoteEditorMode = .formatted
     @State private var escapeMonitor: Any?
 

@@ -10,7 +10,7 @@ struct MiniMonthGrid: View {
     /// Days that carry a task due date — rendered as a red ring around
     /// the day number, like a date circled on a real paper calendar.
     var markedDates: Set<Date> = []
-    var language: AppLanguage = .japanese
+    var language: AppLanguage = .fallback
     var large: Bool = false
 
     private let calendar = Calendar.current

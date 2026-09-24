@@ -8,7 +8,7 @@ import AppKit
 /// `OnboardingView`: that one explains the himekuri philosophy, this one is
 /// the plain credits/version panel every Mac app has.
 struct AboutView: View {
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     /// The himekuri-philosophy screen used to be reachable from Settings'
     /// old ABOUT section; that section is now purely STATISTICS, so it
     /// lives here instead rather than becoming unreachable after first

@@ -7,7 +7,7 @@ struct RootView: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(DiaryStore.self) private var diaryStore
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     @State private var catchUpRequestID = 0
     @State private var focusMode = FocusModeController()
     @State private var taskInteraction = TaskInteractionController()

@@ -8,7 +8,7 @@ import SwiftUI
 /// by today's editable page and the archive.
 struct DayPageHeader: View {
     let date: Date
-    var language: AppLanguage = .japanese
+    var language: AppLanguage = .fallback
 
     @Environment(TaskStore.self) private var taskStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -22,7 +22,7 @@ struct DayPageHeader: View {
     // topRow/leftColumn/rightColumn, all within the same render pass.
     private let koyomi: Koyomi.Day
 
-    init(date: Date, language: AppLanguage = .japanese) {
+    init(date: Date, language: AppLanguage = .fallback) {
         self.date = date
         self.language = language
         self.koyomi = Koyomi.day(for: date)

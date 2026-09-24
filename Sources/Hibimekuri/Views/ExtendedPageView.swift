@@ -20,7 +20,7 @@ struct ExtendedPageView: View {
     var onNextDay: (() -> Void)? = nil
     var onJumpToToday: (() -> Void)? = nil
 
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     @Environment(FocusModeController.self) private var focusMode
     @State private var noteMode: NoteEditorMode = .formatted
 

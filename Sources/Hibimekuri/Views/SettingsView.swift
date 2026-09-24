@@ -9,7 +9,7 @@ struct SettingsView: View {
     @Environment(CustomQuoteStore.self) private var customQuoteStore
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("appLanguage") private var language: AppLanguage = .japanese
+    @AppStorage("appLanguage") private var language: AppLanguage = .fallback
     @AppStorage("quoteStyle") private var quoteStyle: QuoteStyle = .japaneseIdiom
     @AppStorage("appAppearance") private var appearance: AppAppearance = .system
     @AppStorage(StorageLocation.iCloudSyncKey) private var iCloudSyncEnabled: Bool = false

@@ -32,6 +32,9 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case japanese
     case english
 
+    /// Used until the user picks a language in Settings.
+    static let fallback: AppLanguage = .english
+
     var id: String { rawValue }
 
     var displayName: String {

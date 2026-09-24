@@ -233,7 +233,7 @@ final class TaskStore {
             } catch is CancellationError {
                 return
             } catch {
-                self?.storageIssueMessage = JSONFilePersistence.message(for: error, fileName: "tasks.json", language: self?.currentLanguage ?? .japanese)
+                self?.storageIssueMessage = JSONFilePersistence.message(for: error, fileName: "tasks.json", language: self?.currentLanguage ?? .fallback)
             }
         }
     }
@@ -250,8 +250,8 @@ final class TaskStore {
     }
 
     private var currentLanguage: AppLanguage {
-        let raw = UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.japanese.rawValue
-        return AppLanguage(rawValue: raw) ?? .japanese
+        let raw = UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.fallback.rawValue
+        return AppLanguage(rawValue: raw) ?? .fallback
     }
 
     private nonisolated static func mergedTasks(
